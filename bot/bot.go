@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/avvvet/siloam/config"
 	"github.com/avvvet/siloam/db"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const footer = "\n\n— 👋 Hi ሰላም, my name is Siloam | Not a human ሰው አይደለሁም"
+const footer = "\n\n— I am Siloam"
 
 type Bot struct {
 	api *tgbotapi.BotAPI
@@ -63,6 +64,19 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	// Only handle messages in the configured group
 	if msg.Chat.ID != b.cfg.GroupID {
 		return
+	}
+
+	// Respond when bot is mentioned
+	if msg.Entities != nil {
+		for _, e := range msg.Entities {
+			if e.Type == "mention" {
+				mention := msg.Text[e.Offset : e.Offset+e.Length]
+				if mention == "@"+b.api.Self.UserName {
+					b.sendStatus(msg)
+					return
+				}
+			}
+		}
 	}
 
 	text := strings.TrimSpace(msg.Text)
@@ -124,15 +138,25 @@ func (b *Bot) sendIntro(chatID int64) {
 	text := fmt.Sprintf(
 		"👋 Hi ሰላም! I'm *Siloam ሲሎም እባላለሁ*, created by *%s*.\n\n"+
 			"I'm here to manage the apartment water meter readings.\n\n"+
-			"Every month on the *6th*, I'll remind everyone to submit their readings and keep track of all 16 units.\n\n"+
-			"📌 Use this format to submit:\n`a=340, b=590, c=120`\n\n"+
-			"One person can submit for multiple units at once.%s",
+			"Every month on the *6th*, I'll remind everyone to submit their readings and keep track of all 16 houses.\n\n"+
+			"📌 Use this format to submit በዚህ መልኩ ብቻ ይላኩ:\n`a=340, b=590, c=120`\n\n"+
+			"One person can submit for multiple house at once.%s",
 		b.cfg.BotCreator,
 		footer,
 	)
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
 	b.api.Send(msg)
+}
+
+func (b *Bot) sendStatus(msg *tgbotapi.Message) {
+	now := time.Now().UTC()
+	text := fmt.Sprintf(
+		"🟢 I'm alive and running!\n🕐 Server time: %s\n📅 Next submission date: %s",
+		now.Format("Mon, 02 Jan 2006 15:04:05 UTC"),
+		nextSixth(),
+	)
+	b.replyMarkdown(msg, text+footer)
 }
 
 func (b *Bot) sendDMReply(chatID int64) {
