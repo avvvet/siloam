@@ -10,7 +10,7 @@ import (
 )
 
 func (b *Bot) startScheduler() {
-	loc, _ := time.LoadLocation("Africa/Nairobi") // GMT+3
+	loc, _ := time.LoadLocation("Europe/Moscow") // GMT+3
 	c := cron.New(cron.WithLocation(loc))
 
 	// 5th of every month at 8:00 PM — eve reminder

@@ -32,7 +32,7 @@ func parseReadings(text string) map[string]int {
 
 // isSubmissionOpen returns true if current time is between 6th 00:00 and 7th 00:00 GMT+3
 func isSubmissionOpen() bool {
-	loc, _ := time.LoadLocation("Africa/Nairobi") // GMT+3
+	loc, _ := time.LoadLocation("Europe/Moscow") // GMT+3
 	now := time.Now().In(loc)
 	day := now.Day()
 	return day == 6
@@ -40,14 +40,14 @@ func isSubmissionOpen() bool {
 
 // isBeforeWindow returns true if before the 6th
 func isBeforeWindow() bool {
-	loc, _ := time.LoadLocation("Africa/Nairobi")
+	loc, _ := time.LoadLocation("Europe/Moscow")
 	now := time.Now().In(loc)
 	return now.Day() < 6
 }
 
 // nextSixth returns the next 6th date string
 func nextSixth() string {
-	loc, _ := time.LoadLocation("Africa/Nairobi")
+	loc, _ := time.LoadLocation("Europe/Moscow")
 	now := time.Now().In(loc)
 	next := time.Date(now.Year(), now.Month()+1, 6, 0, 0, 0, 0, loc)
 	if now.Day() < 6 {
@@ -58,7 +58,7 @@ func nextSixth() string {
 
 // buildSummary builds the full summary message
 func buildSummary(readings map[string]*db.Reading) string {
-	loc, _ := time.LoadLocation("Africa/Nairobi")
+	loc, _ := time.LoadLocation("Europe/Moscow")
 	now := time.Now().In(loc)
 
 	var sb strings.Builder
