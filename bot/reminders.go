@@ -15,12 +15,12 @@ func (b *Bot) startScheduler() {
 
 	// 5th of every month at 8:00 PM — eve reminder
 	c.AddFunc("0 20 5 * *", func() {
-		b.sendToGroup("📅 *Reminder:* Tomorrow is water reading day!")
+		b.sendToGroup("📅 *Reminder:* Tomorrow is water reading day! ማስታወሻ፡ ነገ የወሃ ቆጣሪዎን ያንብቡ!")
 	})
 
 	// 6th at 8:00 AM — morning reminder
 	c.AddFunc("0 8 6 * *", func() {
-		b.sendToGroup("📊 *Water Reading Day!*\nPlease submit your readings now.\nFormat: `a=340, b=590, c=120`")
+		b.sendToGroup("📊 ዛሪ ይላኩ! *Water Reading Day!*\nPlease submit your readings now.\nFormat: `a=340, b=590, c=120`")
 	})
 
 	// 6th at 1:00 PM — midday reminder (only if pending)
@@ -30,7 +30,7 @@ func (b *Bot) startScheduler() {
 			return
 		}
 		pending := pendingUnits(readings)
-		msg := fmt.Sprintf("⏳ *Midday reminder!*\nStill waiting for: *%s*", strings.Join(pending, ", "))
+		msg := fmt.Sprintf(" ያላካቹ ላኩ! *Midday reminder!*\nStill waiting for: *%s*", strings.Join(pending, ", "))
 		b.sendToGroup(msg)
 	})
 
@@ -41,7 +41,7 @@ func (b *Bot) startScheduler() {
 			return
 		}
 		pending := pendingUnits(readings)
-		msg := fmt.Sprintf("⚠️ *WARNING:* Submission closes at midnight!\nStill waiting for: *%s*", strings.Join(pending, ", "))
+		msg := fmt.Sprintf("ማስጠንቀቅያ ⚠️ *WARNING:* Submission closes at midnight!\nStill waiting for: *%s*", strings.Join(pending, ", "))
 		b.sendToGroup(msg)
 	})
 

@@ -10,7 +10,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const footer = "\n\n— 🤖 Hi, my name is Siloam | Not a human"
+const footer = "\n\n— 👋 Hi ሰላም, my name is Siloam | Not a human ሰው አይደለሁም"
 
 type Bot struct {
 	api *tgbotapi.BotAPI
@@ -80,9 +80,9 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	if !isSubmissionOpen() {
 		var reply string
 		if isBeforeWindow() {
-			reply = fmt.Sprintf("⏳ Readings are not open yet. Next submission date is *%s*.", nextSixth())
+			reply = fmt.Sprintf("አልተጀመረም ገና! Readings are not open yet. Next submission date is *%s*.", nextSixth())
 		} else {
-			reply = fmt.Sprintf("❌ Submission period has closed. Next reading date is *%s*.", nextSixth())
+			reply = fmt.Sprintf("የወሃ ንባብ ተዘግትዋል ❌ Submission period has closed. Next reading date is *%s*.", nextSixth())
 		}
 		b.replyMarkdown(msg, reply+footer)
 		return
@@ -108,7 +108,7 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	}
 
 	// Confirmation message
-	confirmMsg := fmt.Sprintf("*Recorded:*\n%s%s", strings.Join(confirmed, "\n"), footer)
+	confirmMsg := fmt.Sprintf("ተቀብያለሁ Recorded:*\n%s%s", strings.Join(confirmed, "\n"), footer)
 	b.replyMarkdown(msg, confirmMsg)
 
 	// Post updated summary to group
@@ -122,7 +122,7 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 
 func (b *Bot) sendIntro(chatID int64) {
 	text := fmt.Sprintf(
-		"👋 Hi! I'm *Siloam*, created by *%s*.\n\n"+
+		"👋 Hi ሰላም! I'm *Siloam ሲሎም እባላለሁ*, created by *%s*.\n\n"+
 			"I'm here to manage the apartment water meter readings.\n\n"+
 			"Every month on the *6th*, I'll remind everyone to submit their readings and keep track of all 16 units.\n\n"+
 			"📌 Use this format to submit:\n`a=340, b=590, c=120`\n\n"+
