@@ -7,9 +7,10 @@ import (
 
 	"github.com/avvvet/siloam/config"
 	"github.com/avvvet/siloam/db"
-
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+const footer = "\n\n— 🤖 Hi, my name is Siloam | Not a human"
 
 type Bot struct {
 	api *tgbotapi.BotAPI
@@ -28,6 +29,7 @@ func New(cfg *config.Config, database *db.DB) (*Bot, error) {
 
 func (b *Bot) Start() {
 	b.startScheduler()
+	b.sendIntro(b.cfg.GroupID) // greet on every startup
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
@@ -82,7 +84,7 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		} else {
 			reply = fmt.Sprintf("❌ Submission period has closed. Next reading date is *%s*.", nextSixth())
 		}
-		b.replyMarkdown(msg, reply)
+		b.replyMarkdown(msg, reply+footer)
 		return
 	}
 
@@ -106,7 +108,7 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	}
 
 	// Confirmation message
-	confirmMsg := fmt.Sprintf("*Recorded:*\n%s", strings.Join(confirmed, "\n"))
+	confirmMsg := fmt.Sprintf("*Recorded:*\n%s%s", strings.Join(confirmed, "\n"), footer)
 	b.replyMarkdown(msg, confirmMsg)
 
 	// Post updated summary to group
@@ -115,7 +117,7 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		log.Printf("Error getting readings: %v", err)
 		return
 	}
-	b.sendToGroup(buildSummary(readings))
+	b.sendToGroup(buildSummary(readings) + footer)
 }
 
 func (b *Bot) sendIntro(chatID int64) {
@@ -124,8 +126,9 @@ func (b *Bot) sendIntro(chatID int64) {
 			"I'm here to manage the apartment water meter readings.\n\n"+
 			"Every month on the *6th*, I'll remind everyone to submit their readings and keep track of all 16 units.\n\n"+
 			"📌 Use this format to submit:\n`a=340, b=590, c=120`\n\n"+
-			"One person can submit for multiple units at once.",
+			"One person can submit for multiple units at once.%s",
 		b.cfg.BotCreator,
+		footer,
 	)
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
@@ -133,7 +136,7 @@ func (b *Bot) sendIntro(chatID int64) {
 }
 
 func (b *Bot) sendDMReply(chatID int64) {
-	text := "🤖 I only work in the apartment group. Please submit your readings there."
+	text := fmt.Sprintf("🤖 I only work in the apartment group. Please submit your readings there.\n\nYou can contact my creator: %s", b.cfg.BotCreatorUsername) + footer
 	msg := tgbotapi.NewMessage(chatID, text)
 	b.api.Send(msg)
 }

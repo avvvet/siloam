@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	BotToken   string
-	GroupID    int64
-	BotCreator string
+	BotToken           string
+	GroupID            int64
+	BotCreator         string
+	BotCreatorUsername string
 }
 
 func Load() *Config {
@@ -26,8 +27,9 @@ func Load() *Config {
 	}
 
 	return &Config{
-		BotToken:   os.Getenv("BOT_TOKEN"),
-		GroupID:    groupID,
-		BotCreator: os.Getenv("BOT_CREATOR"),
+		BotToken:           os.Getenv("BOT_TOKEN"),
+		GroupID:            groupID,
+		BotCreator:         os.Getenv("BOT_CREATOR"),
+		BotCreatorUsername: os.Getenv("BOT_CREATOR_USERNAME"),
 	}
 }
