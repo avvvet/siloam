@@ -74,7 +74,7 @@ func (b *Bot) finalizeBill() {
 	}
 
 	// Calculate bill
-	computed := calculateBill(readings, previous, bill.TotalBill)
+	computed := calculateBill(readings, previous, bill.TotalBill, b.cfg.AdditionalFee)
 	computed.Finalized = true
 
 	if err := b.db.SaveBill(computed); err != nil {
@@ -89,7 +89,7 @@ func (b *Bot) finalizeBill() {
 	}
 
 	photo := tgbotapi.NewPhoto(b.cfg.GroupID, tgbotapi.FilePath(imgPath))
-	photo.Caption = fmt.Sprintf("💧 *Water Bill — %.0f Birr*\nPlease pay within 3 days.\nFormat: `a=300birr`%s", bill.TotalBill, footer)
+	photo.Caption = fmt.Sprintf("💧 *Water Bill generated*\nPlease pay within 3 days.\n\nAfter you pay please post exactly this format:\n_Example if your payment is 300 Birr, post:_\n`a=300birr`%s", footer)
 	photo.ParseMode = "Markdown"
 	b.api.Send(photo)
 }

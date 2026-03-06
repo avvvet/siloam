@@ -14,7 +14,8 @@ type Config struct {
 	GroupID            int64
 	BotCreator         string
 	BotCreatorUsername string
-	PreviousReadings   map[string]int // unit -> previous reading
+	PreviousReadings   map[string]int
+	AdditionalFee      float64
 }
 
 func Load() *Config {
@@ -28,16 +29,23 @@ func Load() *Config {
 		log.Fatalf("Invalid GROUP_ID: %v", err)
 	}
 
+	additionalFee := 50.0
+	if v := os.Getenv("ADDITIONAL_FEE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			additionalFee = f
+		}
+	}
+
 	return &Config{
 		BotToken:           os.Getenv("BOT_TOKEN"),
 		GroupID:            groupID,
 		BotCreator:         os.Getenv("BOT_CREATOR"),
 		BotCreatorUsername: os.Getenv("BOT_CREATOR_USERNAME"),
 		PreviousReadings:   parsePreviousReadings(os.Getenv("PREVIOUS_READINGS")),
+		AdditionalFee:      additionalFee,
 	}
 }
 
-// parsePreviousReadings parses "a=100,b=200,c=300" from env
 func parsePreviousReadings(raw string) map[string]int {
 	result := make(map[string]int)
 	if raw == "" {

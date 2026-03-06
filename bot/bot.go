@@ -11,7 +11,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const footer = "\n\n— 🤖 Hi, my name is Siloam | Not a human"
+const footer = "\n\n— Siloam"
 
 type Bot struct {
 	api *tgbotapi.BotAPI
@@ -92,14 +92,24 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		return
 	}
 
-	// Handle payment submission
+	// Handle payment submission — only allowed after bill is finalized
 	if payments := parsePayments(text); len(payments) > 0 {
+		bill, _ := b.db.GetBill()
+		if bill == nil || !bill.Finalized {
+			// Bill not finalized yet — silently ignore
+			return
+		}
 		b.handlePayments(msg, payments)
 		return
 	}
 
-	// Handle reading submission
+	// Handle reading submission — block if bill already set
 	if parsed := parseReadings(text); len(parsed) > 0 {
+		bill, _ := b.db.GetBill()
+		if bill != nil {
+			// Bill has been set, readings are closed — silently ignore
+			return
+		}
 		b.handleReadings(msg, parsed)
 		return
 	}

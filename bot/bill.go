@@ -17,15 +17,18 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+const additionalFeeNote = "800 Birr is for water pump and staircase light electricity"
+
 // calculateBill computes each unit's bill share from readings and previous readings
-func calculateBill(readings map[string]*db.Reading, previous map[string]int, totalBill float64) *db.Bill {
+func calculateBill(readings map[string]*db.Reading, previous map[string]int, totalBill float64, additionalFee float64) *db.Bill {
 	bill := &db.Bill{
-		TotalBill: totalBill,
-		Units:     make(map[string]float64),
-		Diffs:     make(map[string]int),
-		Percents:  make(map[string]float64),
-		Previous:  make(map[string]int),
-		Current:   make(map[string]int),
+		TotalBill:     totalBill,
+		AdditionalFee: additionalFee,
+		Units:         make(map[string]float64),
+		Diffs:         make(map[string]int),
+		Percents:      make(map[string]float64),
+		Previous:      make(map[string]int),
+		Current:       make(map[string]int),
 	}
 
 	totalUsage := 0
@@ -68,28 +71,36 @@ func generateBillImage(bill *db.Bill, creatorUsername string) (string, error) {
 	monthStr := now.Format("January 2006")
 	dateStr := now.Format("January 02, 2006")
 
+	additionalFee := bill.AdditionalFee
+	totalAdditional := additionalFee * 16
+	grandTotal := bill.TotalBill + totalAdditional
+
 	// Image dimensions
-	width := 900
-	rowHeight := 28
-	headerRows := 6
-	tableRows := len(allUnits) + 2 // units + header + total
-	footerRows := 3
-	height := (headerRows+tableRows+footerRows)*rowHeight + 60
+	width := 1000
+	rowHeight := 30
+	headerRows := 5
+	tableRows := len(allUnits) + 2
+	noteRows := 2
+	footerRows := 2
+	height := (headerRows+tableRows+noteRows+footerRows)*rowHeight + 80
 
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
-	// Background
-	draw.Draw(img, img.Bounds(), &image.Uniform{color.White}, image.Point{}, draw.Src)
-
 	// Colors
-	headerBg := color.RGBA{30, 80, 160, 255} // dark blue
-	tableHeaderBg := color.RGBA{70, 130, 200, 255}
-	rowEven := color.RGBA{240, 246, 255, 255}
+	bgWhite := color.RGBA{255, 255, 255, 255}
+	headerBg := color.RGBA{80, 80, 80, 255}
+	tableHeaderBg := color.RGBA{110, 110, 110, 255}
+	rowEven := color.RGBA{235, 235, 235, 255}
 	rowOdd := color.RGBA{255, 255, 255, 255}
 	textDark := color.RGBA{30, 30, 30, 255}
 	textWhite := color.RGBA{255, 255, 255, 255}
+	noteBg := color.RGBA{255, 248, 220, 255}
 	footerBg := color.RGBA{245, 245, 245, 255}
-	borderColor := color.RGBA{200, 210, 230, 255}
+	borderColor := color.RGBA{190, 210, 235, 255}
+	totalRowBg := color.RGBA{80, 80, 80, 255}
+
+	// Background
+	draw.Draw(img, img.Bounds(), &image.Uniform{bgWhite}, image.Point{}, draw.Src)
 
 	face := basicfont.Face7x13
 
@@ -100,6 +111,18 @@ func generateBillImage(bill *db.Bill, creatorUsername string) (string, error) {
 			Face: face,
 			Dot:  fixed.P(x, y),
 		}
+		d.DrawString(text)
+	}
+
+	drawTextCentered := func(y int, c color.Color, text string) {
+		d := &font.Drawer{
+			Dst:  img,
+			Src:  image.NewUniform(c),
+			Face: face,
+		}
+		w := d.MeasureString(text).Ceil()
+		x := (width - w) / 2
+		d.Dot = fixed.P(x, y)
 		d.DrawString(text)
 	}
 
@@ -119,28 +142,27 @@ func generateBillImage(bill *db.Bill, creatorUsername string) (string, error) {
 
 	y := 10
 
-	// Title header background
-	fillRect(0, y, width, rowHeight*3, headerBg)
-	drawText(width/2-120, y+15, textWhite, fmt.Sprintf("WATER BILL REPORT — %s", strings.ToUpper(monthStr)))
-	drawText(width/2-80, y+35, textWhite, fmt.Sprintf("Date: %s", dateStr))
-	drawText(width/2-100, y+55, textWhite, fmt.Sprintf("Total Bill: %.0f Birr", bill.TotalBill))
-	y += rowHeight*3 + 10
+	// ── Header ──
+	fillRect(0, y, width, rowHeight*headerRows, headerBg)
+	drawTextCentered(y+20, textWhite, "WATER BILL REPORT")
+	drawTextCentered(y+40, textWhite, strings.ToUpper(monthStr))
+	drawTextCentered(y+60, textWhite, fmt.Sprintf("Date: %s", dateStr))
+	drawTextCentered(y+80, textWhite, fmt.Sprintf("Water Bill: %.0f Birr   |   Pump & Electricity: %.0f Birr", bill.TotalBill, totalAdditional))
+	drawTextCentered(y+100, textWhite, fmt.Sprintf("Grand Total: %.0f Birr", grandTotal))
+	y += rowHeight*headerRows + 10
 
-	// Table columns: Unit | Previous | Current | Diff | % | Amount
-	cols := []string{"Unit", "Previous", "Current", "Diff", "%", "Amount (Birr)"}
-	colWidths := []int{80, 120, 120, 100, 100, 160}
-	colX := []int{20, 100, 220, 340, 440, 540}
+	// ── Table header ──
+	cols := []string{"House", "Previous", "Current", "Diff", "%", "Water Share", "Additional", "Total"}
+	colX := []int{10, 90, 190, 290, 370, 460, 590, 720}
 
-	// Table header row
 	fillRect(0, y, width, rowHeight, tableHeaderBg)
 	for i, col := range cols {
-		drawText(colX[i]+5, y+18, textWhite, col)
-		_ = colWidths[i]
+		drawText(colX[i]+4, y+20, textWhite, col)
 	}
 	y += rowHeight
 
-	// Unit rows
-	var totalAmount float64
+	// ── Unit rows ──
+	var grandTotalAmount float64
 	for idx, unit := range allUnits {
 		bg := rowOdd
 		if idx%2 == 0 {
@@ -153,30 +175,42 @@ func generateBillImage(bill *db.Bill, creatorUsername string) (string, error) {
 		curr := bill.Current[unit]
 		diff := bill.Diffs[unit]
 		pct := bill.Percents[unit]
-		amount := bill.Units[unit]
-		totalAmount += amount
+		waterShare := bill.Units[unit]
+		total := waterShare + additionalFee
+		grandTotalAmount += total
 
-		drawText(colX[0]+5, y+18, textDark, strings.ToUpper(unit))
-		drawText(colX[1]+5, y+18, textDark, fmt.Sprintf("%d", prev))
-		drawText(colX[2]+5, y+18, textDark, fmt.Sprintf("%d", curr))
-		drawText(colX[3]+5, y+18, textDark, fmt.Sprintf("%d", diff))
-		drawText(colX[4]+5, y+18, textDark, fmt.Sprintf("%.2f%%", pct))
-		drawText(colX[5]+5, y+18, textDark, fmt.Sprintf("%.0f Birr", amount))
+		drawText(colX[0]+4, y+20, textDark, strings.ToUpper(unit))
+		drawText(colX[1]+4, y+20, textDark, fmt.Sprintf("%d", prev))
+		drawText(colX[2]+4, y+20, textDark, fmt.Sprintf("%d", curr))
+		drawText(colX[3]+4, y+20, textDark, fmt.Sprintf("%d", diff))
+		drawText(colX[4]+4, y+20, textDark, fmt.Sprintf("%.2f%%", pct))
+		drawText(colX[5]+4, y+20, textDark, fmt.Sprintf("%.0f Birr", waterShare))
+		drawText(colX[6]+4, y+20, textDark, fmt.Sprintf("%.0f Birr", additionalFee))
+		drawText(colX[7]+4, y+20, textDark, fmt.Sprintf("%.0f Birr", total))
 		y += rowHeight
 	}
 
-	// Total row
-	fillRect(0, y, width, rowHeight, tableHeaderBg)
-	drawText(colX[0]+5, y+18, textWhite, "TOTAL")
-	drawText(colX[5]+5, y+18, textWhite, fmt.Sprintf("%.0f Birr", totalAmount))
+	// ── Total row ──
+	fillRect(0, y, width, rowHeight, totalRowBg)
+	drawText(colX[0]+4, y+20, textWhite, "TOTAL")
+	drawText(colX[7]+4, y+20, textWhite, fmt.Sprintf("%.0f Birr", grandTotalAmount))
 	y += rowHeight + 10
 
-	// Footer
-	fillRect(0, y, width, rowHeight*3, footerBg)
+	// ── Note section (middle) ──
+	fillRect(0, y, width, rowHeight*noteRows, noteBg)
 	drawHLine(0, y, width, borderColor)
-	drawText(20, y+15, textDark, "Report is generated by automated system and hosted on generously provided U.S server.")
-	drawText(20, y+33, textDark, fmt.Sprintf("Manager: Siloam  |  Creator: %s", creatorUsername))
-	drawText(20, y+51, textDark, fmt.Sprintf("Generated: %s", now.Format("02 Jan 2006 15:04 MST")))
+	drawTextCentered(y+20, textDark, "📌 Note:")
+	drawTextCentered(y+40, textDark, additionalFeeNote)
+	y += rowHeight*noteRows + 10
+
+	// ── Footer ──
+	fillRect(0, y, width, rowHeight*footerRows, footerBg)
+	drawHLine(0, y, width, borderColor)
+	// smaller feel using spacing
+	drawTextCentered(y+18, color.RGBA{100, 100, 100, 255},
+		"Report is generated by automated software deployed and hosted on generously provided U.S based cloud server provider.")
+	drawTextCentered(y+34, color.RGBA{100, 100, 100, 255},
+		fmt.Sprintf("Manager: Siloam  |  Creator: %s", creatorUsername))
 
 	// Save to temp file
 	path := fmt.Sprintf("/tmp/bill_%s.png", now.Format("2006-01"))

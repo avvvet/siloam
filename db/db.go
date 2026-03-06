@@ -24,15 +24,16 @@ type Reading struct {
 }
 
 type Bill struct {
-	Month     string             `json:"month"`
-	TotalBill float64            `json:"total_bill"`
-	Units     map[string]float64 `json:"units"`     // unit -> amount owed
-	Diffs     map[string]int     `json:"diffs"`     // unit -> usage difference
-	Percents  map[string]float64 `json:"percents"`  // unit -> percentage
-	Previous  map[string]int     `json:"previous"`  // unit -> previous reading
-	Current   map[string]int     `json:"current"`   // unit -> current reading
-	Finalized bool               `json:"finalized"` // true after midnight calculation
-	UpdatedAt time.Time          `json:"updated_at"`
+	AdditionalFee float64            `json:"additional_fee"`
+	Month         string             `json:"month"`
+	TotalBill     float64            `json:"total_bill"`
+	Units         map[string]float64 `json:"units"`     // unit -> amount owed
+	Diffs         map[string]int     `json:"diffs"`     // unit -> usage difference
+	Percents      map[string]float64 `json:"percents"`  // unit -> percentage
+	Previous      map[string]int     `json:"previous"`  // unit -> previous reading
+	Current       map[string]int     `json:"current"`   // unit -> current reading
+	Finalized     bool               `json:"finalized"` // true after midnight calculation
+	UpdatedAt     time.Time          `json:"updated_at"`
 }
 
 type Payment struct {
