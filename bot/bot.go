@@ -11,7 +11,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const footer = "\n\n— I am Siloam"
+const footer = "\n\n— 🤖 Hi, my name is Siloam | Not a human"
 
 type Bot struct {
 	api *tgbotapi.BotAPI
@@ -30,7 +30,9 @@ func New(cfg *config.Config, database *db.DB) (*Bot, error) {
 
 func (b *Bot) Start() {
 	b.startScheduler()
-	b.sendIntro(b.cfg.GroupID) // greet on every startup
+
+	// Uncomment to greet on every startup
+	// b.sendIntro(b.cfg.GroupID)
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
@@ -45,15 +47,15 @@ func (b *Bot) Start() {
 }
 
 func (b *Bot) handleMessage(msg *tgbotapi.Message) {
-	// Bot added to a group
-	if msg.NewChatMembers != nil {
-		for _, member := range msg.NewChatMembers {
-			if member.ID == b.api.Self.ID {
-				b.sendIntro(msg.Chat.ID)
-				return
-			}
-		}
-	}
+	// Bot added to a group — uncomment to greet on join
+	// if msg.NewChatMembers != nil {
+	// 	for _, member := range msg.NewChatMembers {
+	// 		if member.ID == b.api.Self.ID {
+	// 			b.sendIntro(msg.Chat.ID)
+	// 			return
+	// 		}
+	// 	}
+	// }
 
 	// DM — not a group
 	if !msg.Chat.IsGroup() && !msg.Chat.IsSuperGroup() {
@@ -84,25 +86,37 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		return
 	}
 
-	// Try to parse readings
-	parsed := parseReadings(text)
-	if len(parsed) == 0 {
-		return // Not a reading message, ignore
+	// Handle /bill command
+	if amount, ok := parseBillCommand(text); ok {
+		b.handleBillCommand(msg, amount)
+		return
 	}
 
-	// Check submission window
+	// Handle payment submission
+	if payments := parsePayments(text); len(payments) > 0 {
+		b.handlePayments(msg, payments)
+		return
+	}
+
+	// Handle reading submission
+	if parsed := parseReadings(text); len(parsed) > 0 {
+		b.handleReadings(msg, parsed)
+		return
+	}
+}
+
+func (b *Bot) handleReadings(msg *tgbotapi.Message, parsed map[string]int) {
 	if !isSubmissionOpen() {
 		var reply string
 		if isBeforeWindow() {
-			reply = fmt.Sprintf("አልተጀመረም ገና! Readings are not open yet. Next submission date is *%s*.", nextSixth())
+			reply = fmt.Sprintf("⏳ Readings are not open yet. Next submission date is *%s*.", nextSixth())
 		} else {
-			reply = fmt.Sprintf("የወሃ ንባብ ተዘግትዋል ❌ Submission period has closed. Next reading date is *%s*.", nextSixth())
+			reply = fmt.Sprintf("❌ Submission period has closed. Next reading date is *%s*.", nextSixth())
 		}
 		b.replyMarkdown(msg, reply+footer)
 		return
 	}
 
-	// Save each reading
 	var confirmed []string
 	for unit, value := range parsed {
 		reading, err := b.db.SaveReading(unit, value)
@@ -121,32 +135,91 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		return
 	}
 
-	// Confirmation message
-	confirmMsg := fmt.Sprintf("ተቀብያለሁ Recorded:*\n%s%s", strings.Join(confirmed, "\n"), footer)
-	b.replyMarkdown(msg, confirmMsg)
+	b.replyMarkdown(msg, fmt.Sprintf("*Recorded:*\n%s%s", strings.Join(confirmed, "\n"), footer))
 
-	// Post updated summary to group
 	readings, err := b.db.GetAllReadings()
 	if err != nil {
-		log.Printf("Error getting readings: %v", err)
 		return
 	}
 	b.sendToGroup(buildSummary(readings) + footer)
+
+	// All 16 submitted — prompt for bill
+	if allSubmitted(readings) {
+		b.sendToGroup(fmt.Sprintf("🎉 *All readings submitted!*\nPost the total bill amount using:\n`/bill 5000`%s", footer))
+	}
 }
 
-func (b *Bot) sendIntro(chatID int64) {
-	text := fmt.Sprintf(
-		"👋 Hi ሰላም! I'm *Siloam ሲሎም እባላለሁ*, created by *%s*.\n\n"+
-			"I'm here to manage the apartment water meter readings.\n\n"+
-			"Every month on the *6th*, I'll remind everyone to submit their readings and keep track of all 16 houses.\n\n"+
-			"📌 Use this format to submit በዚህ መልኩ ብቻ ይላኩ:\n`a=340, b=590, c=120`\n\n"+
-			"One person can submit for multiple house at once.%s",
-		b.cfg.BotCreator,
-		footer,
-	)
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ParseMode = "Markdown"
-	b.api.Send(msg)
+func (b *Bot) handleBillCommand(msg *tgbotapi.Message, amount float64) {
+	// Check all readings submitted
+	readings, err := b.db.GetAllReadings()
+	if err != nil || !allSubmitted(readings) {
+		b.replyMarkdown(msg, "⚠️ Cannot post bill yet — not all 16 readings submitted."+footer)
+		return
+	}
+
+	// Save bill (not finalized yet, finalized at midnight)
+	bill := &db.Bill{
+		TotalBill: amount,
+		Units:     make(map[string]float64),
+		Diffs:     make(map[string]int),
+		Percents:  make(map[string]float64),
+		Previous:  make(map[string]int),
+		Current:   make(map[string]int),
+	}
+	if err := b.db.SaveBill(bill); err != nil {
+		log.Printf("Error saving bill: %v", err)
+		return
+	}
+
+	b.replyMarkdown(msg, fmt.Sprintf(
+		"✅ *Bill amount set: %.0f Birr*\nYou can update it with `/bill [amount]` until midnight.\nFinal calculation will be posted at midnight.%s",
+		amount, footer,
+	))
+}
+
+func (b *Bot) handlePayments(msg *tgbotapi.Message, payments map[string]float64) {
+	bill, err := b.db.GetBill()
+	if err != nil || bill == nil || !bill.Finalized {
+		return // silently ignore if bill not finalized
+	}
+
+	var confirmed []string
+	for unit, amount := range payments {
+		owed := bill.Units[unit]
+		if amount < owed {
+			confirmed = append(confirmed, fmt.Sprintf("❌ *%s:* %.0f Birr is less than owed %.0f Birr", strings.ToUpper(unit), amount, owed))
+			continue
+		}
+		payment, err := b.db.SavePayment(unit, amount)
+		if err != nil {
+			log.Printf("Error saving payment for unit %s: %v", unit, err)
+			continue
+		}
+		if payment.Updated {
+			confirmed = append(confirmed, fmt.Sprintf("🔄 *%s:* %.0f Birr _(updated from %.0f)_", strings.ToUpper(unit), amount, payment.OldAmount))
+		} else {
+			confirmed = append(confirmed, fmt.Sprintf("✅ *%s:* %.0f Birr paid", strings.ToUpper(unit), amount))
+		}
+	}
+
+	if len(confirmed) > 0 {
+		b.replyMarkdown(msg, fmt.Sprintf("*Payment Recorded:*\n%s%s", strings.Join(confirmed, "\n"), footer))
+	}
+
+	allPayments, err := b.db.GetAllPayments()
+	if err != nil {
+		return
+	}
+
+	b.sendToGroup(buildPaymentSummary(allPayments, bill.Units) + footer)
+
+	// All paid
+	if allPaid(allPayments, bill.Units) {
+		b.sendToGroup(fmt.Sprintf(
+			"🎊 *All payments received!*\n\nThis month's water bill has ended.\nPlease pay *%.0f Birr* to the water authority today.\n\nSee you next month! 💧%s",
+			bill.TotalBill, footer,
+		))
+	}
 }
 
 func (b *Bot) sendStatus(msg *tgbotapi.Message) {
@@ -157,6 +230,21 @@ func (b *Bot) sendStatus(msg *tgbotapi.Message) {
 		nextSixth(),
 	)
 	b.replyMarkdown(msg, text+footer)
+}
+
+func (b *Bot) sendIntro(chatID int64) {
+	text := fmt.Sprintf(
+		"👋 Hi! I'm *Siloam*, created by *%s*.\n\n"+
+			"I'm here to manage the apartment water meter readings.\n\n"+
+			"Every month on the *6th*, I'll remind everyone to submit their readings and keep track of all 16 units.\n\n"+
+			"📌 Use this format to submit:\n`a=340, b=590, c=120`\n\n"+
+			"One person can submit for multiple units at once.%s",
+		b.cfg.BotCreator,
+		footer,
+	)
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "Markdown"
+	b.api.Send(msg)
 }
 
 func (b *Bot) sendDMReply(chatID int64) {
