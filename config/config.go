@@ -10,12 +10,17 @@ import (
 )
 
 type Config struct {
+	// Siloam
 	BotToken           string
 	GroupID            int64
 	BotCreator         string
 	BotCreatorUsername string
 	PreviousReadings   map[string]int
 	AdditionalFee      float64
+
+	// Tahor
+	TahorBotToken string
+	TahorGroupID  int64
 }
 
 func Load() *Config {
@@ -23,10 +28,14 @@ func Load() *Config {
 		log.Println("No .env file found, reading from environment")
 	}
 
-	groupIDStr := os.Getenv("GROUP_ID")
-	groupID, err := strconv.ParseInt(groupIDStr, 10, 64)
+	groupID, err := strconv.ParseInt(os.Getenv("GROUP_ID"), 10, 64)
 	if err != nil {
 		log.Fatalf("Invalid GROUP_ID: %v", err)
+	}
+
+	tahorGroupID, err := strconv.ParseInt(os.Getenv("TAHOR_GROUP_ID"), 10, 64)
+	if err != nil {
+		log.Fatalf("Invalid TAHOR_GROUP_ID: %v", err)
 	}
 
 	additionalFee := 50.0
@@ -43,6 +52,8 @@ func Load() *Config {
 		BotCreatorUsername: os.Getenv("BOT_CREATOR_USERNAME"),
 		PreviousReadings:   parsePreviousReadings(os.Getenv("PREVIOUS_READINGS")),
 		AdditionalFee:      additionalFee,
+		TahorBotToken:      os.Getenv("TAHOR_BOT_TOKEN"),
+		TahorGroupID:       tahorGroupID,
 	}
 }
 
