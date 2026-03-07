@@ -32,7 +32,12 @@ func main() {
 		siloam.Start()
 
 	case "tahor":
-		tahorBot, err := tahor.New(cfg, database)
+		tahorDB, err := db.Open("tahor.db")
+		if err != nil {
+			log.Fatalf("Failed to open Tahor database: %v", err)
+		}
+		defer tahorDB.Close()
+		tahorBot, err := tahor.New(cfg, tahorDB)
 		if err != nil {
 			log.Fatalf("Failed to create Tahor bot: %v", err)
 		}
@@ -44,7 +49,12 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to create Siloam bot: %v", err)
 		}
-		tahorBot, err := tahor.New(cfg, database)
+		tahorDB, err := db.Open("tahor.db")
+		if err != nil {
+			log.Fatalf("Failed to open Tahor database: %v", err)
+		}
+		defer tahorDB.Close()
+		tahorBot, err := tahor.New(cfg, tahorDB)
 		if err != nil {
 			log.Fatalf("Failed to create Tahor bot: %v", err)
 		}
