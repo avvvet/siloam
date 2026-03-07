@@ -88,7 +88,7 @@ func allSubmitted(readings map[string]*db.Reading) bool {
 	return len(readings) == 16
 }
 
-// buildSummary builds the full reading summary message
+// buildSummary builds the compact reading summary message
 func buildSummary(readings map[string]*db.Reading) string {
 	loc, _ := time.LoadLocation("Europe/Moscow")
 	now := time.Now().In(loc)
@@ -96,55 +96,132 @@ func buildSummary(readings map[string]*db.Reading) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("📋 *Water Readings — %s*\n\n", now.Format("January 2006")))
 
-	submitted := 0
+	var submittedList, updatedList, pendingList []string
+
 	for _, unit := range allUnits {
 		r, ok := readings[unit]
 		if ok {
 			if r.Updated {
-				sb.WriteString(fmt.Sprintf("🔄 *%s:* %d _(updated from %d)_\n", strings.ToUpper(unit), r.Value, r.OldValue))
+				updatedList = append(updatedList, fmt.Sprintf("%s:%d→%d", strings.ToUpper(unit), r.OldValue, r.Value))
 			} else {
-				sb.WriteString(fmt.Sprintf("✅ *%s:* %d\n", strings.ToUpper(unit), r.Value))
+				submittedList = append(submittedList, fmt.Sprintf("%s:%d", strings.ToUpper(unit), r.Value))
 			}
-			submitted++
 		} else {
-			sb.WriteString(fmt.Sprintf("❌ *%s:* not submitted\n", strings.ToUpper(unit)))
+			pendingList = append(pendingList, strings.ToUpper(unit))
 		}
 	}
 
+	// Submitted — 4 per row
+	if len(submittedList) > 0 {
+		sb.WriteString("✅ *Submitted:*\n")
+		for i, entry := range submittedList {
+			sb.WriteString(fmt.Sprintf("%-12s", entry))
+			if (i+1)%4 == 0 {
+				sb.WriteString("\n")
+			}
+		}
+		if len(submittedList)%4 != 0 {
+			sb.WriteString("\n")
+		}
+	}
+
+	// Updated — 4 per row
+	if len(updatedList) > 0 {
+		sb.WriteString("\n🔄 *Updated:*\n")
+		for i, entry := range updatedList {
+			sb.WriteString(fmt.Sprintf("%-16s", entry))
+			if (i+1)%4 == 0 {
+				sb.WriteString("\n")
+			}
+		}
+		if len(updatedList)%4 != 0 {
+			sb.WriteString("\n")
+		}
+	}
+
+	// Pending
+	if len(pendingList) > 0 {
+		sb.WriteString(fmt.Sprintf("\n❌ *Pending:* %s\n", strings.Join(pendingList, ", ")))
+	}
+
+	submitted := len(submittedList) + len(updatedList)
 	sb.WriteString(fmt.Sprintf("\n*Submitted: %d/16 | Pending: %d*", submitted, 16-submitted))
 	return sb.String()
 }
 
-// buildPaymentSummary builds the payment status summary
-func buildPaymentSummary(payments map[string]*db.Payment, bills map[string]float64) string {
+// buildPaymentSummary builds the compact payment status summary
+func buildPaymentSummary(payments map[string]*db.Payment, bills map[string]float64, additionalFee float64) string {
 	loc, _ := time.LoadLocation("Europe/Moscow")
 	now := time.Now().In(loc)
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("💳 *Payment Status — %s*\n\n", now.Format("January 2006")))
 
+	var paidList, updatedList, pendingList []string
 	var totalPaid, totalOwed float64
 	paid := 0
 
 	for _, unit := range allUnits {
-		owed := bills[unit]
+		waterShare := bills[unit]
+		owed := waterShare + additionalFee
 		totalOwed += owed
 		p, ok := payments[unit]
 		if ok {
 			totalPaid += p.Amount
 			paid++
 			if p.Updated {
-				sb.WriteString(fmt.Sprintf("🔄 *%s:* %.0f Birr _(updated from %.0f)_ ✅\n", strings.ToUpper(unit), p.Amount, p.OldAmount))
+				updatedList = append(updatedList, fmt.Sprintf("%s:%.0f→%.0f", strings.ToUpper(unit), p.OldAmount, p.Amount))
 			} else {
-				sb.WriteString(fmt.Sprintf("✅ *%s:* %.0f Birr\n", strings.ToUpper(unit), p.Amount))
+				paidList = append(paidList, fmt.Sprintf("%s:%.0f", strings.ToUpper(unit), p.Amount))
 			}
 		} else {
-			if owed == 0 {
-				sb.WriteString(fmt.Sprintf("⬜ *%s:* 0 Birr _(vacant)_\n", strings.ToUpper(unit)))
-				paid++ // vacant units count as settled
+			if waterShare == 0 {
+				pendingList = append(pendingList, fmt.Sprintf("%s:%.0f(add)", strings.ToUpper(unit), additionalFee))
 			} else {
-				sb.WriteString(fmt.Sprintf("❌ *%s:* owes %.0f Birr\n", strings.ToUpper(unit), owed))
+				pendingList = append(pendingList, fmt.Sprintf("%s:%.0f", strings.ToUpper(unit), owed))
 			}
+		}
+	}
+
+	// Paid — 4 per row
+	if len(paidList) > 0 {
+		sb.WriteString("✅ *Paid:*\n")
+		for i, entry := range paidList {
+			sb.WriteString(fmt.Sprintf("%-12s", entry))
+			if (i+1)%4 == 0 {
+				sb.WriteString("\n")
+			}
+		}
+		if len(paidList)%4 != 0 {
+			sb.WriteString("\n")
+		}
+	}
+
+	// Updated — 4 per row
+	if len(updatedList) > 0 {
+		sb.WriteString("\n🔄 *Updated:*\n")
+		for i, entry := range updatedList {
+			sb.WriteString(fmt.Sprintf("%-16s", entry))
+			if (i+1)%4 == 0 {
+				sb.WriteString("\n")
+			}
+		}
+		if len(updatedList)%4 != 0 {
+			sb.WriteString("\n")
+		}
+	}
+
+	// Not paid — 4 per row
+	if len(pendingList) > 0 {
+		sb.WriteString("\n❌ *Not paid:*\n")
+		for i, entry := range pendingList {
+			sb.WriteString(fmt.Sprintf("%-14s", entry))
+			if (i+1)%4 == 0 {
+				sb.WriteString("\n")
+			}
+		}
+		if len(pendingList)%4 != 0 {
+			sb.WriteString("\n")
 		}
 	}
 
@@ -166,7 +243,7 @@ func pendingUnits(readings map[string]*db.Reading) []string {
 }
 
 // pendingPaymentUnits returns list of units that have not paid
-func pendingPaymentUnits(payments map[string]*db.Payment, bills map[string]float64) []string {
+func pendingPaymentUnits(payments map[string]*db.Payment, bills map[string]float64, additionalFee float64) []string {
 	var pending []string
 	for _, unit := range allUnits {
 		if bills[unit] == 0 {
@@ -181,6 +258,6 @@ func pendingPaymentUnits(payments map[string]*db.Payment, bills map[string]float
 }
 
 // allPaid returns true if all non-vacant units have paid
-func allPaid(payments map[string]*db.Payment, bills map[string]float64) bool {
-	return len(pendingPaymentUnits(payments, bills)) == 0
+func allPaid(payments map[string]*db.Payment, bills map[string]float64, additionalFee float64) bool {
+	return len(pendingPaymentUnits(payments, bills, additionalFee)) == 0
 }

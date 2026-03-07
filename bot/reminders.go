@@ -105,7 +105,7 @@ func (b *Bot) sendPaymentReminder() {
 		return
 	}
 
-	pending := pendingPaymentUnits(payments, bill.Units)
+	pending := pendingPaymentUnits(payments, bill.Units, bill.AdditionalFee)
 	if len(pending) == 0 {
 		return
 	}

@@ -221,10 +221,10 @@ func (b *Bot) handlePayments(msg *tgbotapi.Message, payments map[string]float64)
 		return
 	}
 
-	b.sendToGroup(buildPaymentSummary(allPayments, bill.Units) + footer)
+	b.sendToGroup(buildPaymentSummary(allPayments, bill.Units, bill.AdditionalFee) + footer)
 
 	// All paid
-	if allPaid(allPayments, bill.Units) {
+	if allPaid(allPayments, bill.Units, bill.AdditionalFee) {
 		b.sendToGroup(fmt.Sprintf(
 			"🎊 *All payments received!*\n\nThis month's water bill has ended.\nPlease pay *%.0f Birr* to the water authority today.\n\nSee you next month! 💧%s",
 			bill.TotalBill, footer,
