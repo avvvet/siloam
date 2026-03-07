@@ -16,14 +16,13 @@ func main() {
 
 	cfg := config.Load()
 
-	database, err := db.Open("siloam.db")
-	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
-	}
-	defer database.Close()
-
 	switch *botFlag {
 	case "siloam":
+		database, err := db.Open("siloam.db")
+		if err != nil {
+			log.Fatalf("Failed to open Siloam database: %v", err)
+		}
+		defer database.Close()
 		siloam, err := bot.New(cfg, database)
 		if err != nil {
 			log.Fatalf("Failed to create Siloam bot: %v", err)
@@ -45,15 +44,20 @@ func main() {
 		tahorBot.Start()
 
 	default:
-		siloam, err := bot.New(cfg, database)
+		database, err := db.Open("siloam.db")
 		if err != nil {
-			log.Fatalf("Failed to create Siloam bot: %v", err)
+			log.Fatalf("Failed to open Siloam database: %v", err)
 		}
+		defer database.Close()
 		tahorDB, err := db.Open("tahor.db")
 		if err != nil {
 			log.Fatalf("Failed to open Tahor database: %v", err)
 		}
 		defer tahorDB.Close()
+		siloam, err := bot.New(cfg, database)
+		if err != nil {
+			log.Fatalf("Failed to create Siloam bot: %v", err)
+		}
 		tahorBot, err := tahor.New(cfg, tahorDB)
 		if err != nil {
 			log.Fatalf("Failed to create Tahor bot: %v", err)
