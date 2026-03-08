@@ -45,7 +45,7 @@ func (b *Bot) startScheduler() {
 	c := cron.New(cron.WithLocation(loc))
 
 	// Every 2 hours on March 7 and 8 before draw — pre-draw reminder
-	c.AddFunc("0 */2 7,8 3 *", func() {
+	c.AddFunc("30 */2 7,8 3 *", func() {
 		b.sendPreDrawReminder()
 	})
 
