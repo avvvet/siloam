@@ -110,8 +110,8 @@ func (b *Bot) sendPaymentReminder() {
 		return
 	}
 
-	b.sendToGroup(fmt.Sprintf("💳 *Payment Reminder!*\nStill waiting for: *%s*\n\nFormat: `a=300birr`%s",
-		strings.Join(pending, ", "), footer))
+	b.sendToGroup(fmt.Sprintf("💧 *የውሃ ክፍያ አስታዋሽ!*\n\n❌ *ያልከፈሉ:* %s\n\nከፈሉ በኋላ — ምሳሌ: `a=300birr`\n\n*ያልከፈሉ: %d/16 | እባክዎ ይክፈሉ! 🙏*%s",
+		strings.Join(pending, ", "), len(pending), footer))
 }
 
 func (b *Bot) sendToGroup(text string) {

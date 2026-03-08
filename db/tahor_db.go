@@ -197,3 +197,12 @@ func (d *DB) GetTahorLedger(cycleID string) ([]*TahorLedger, error) {
 	})
 	return entries, err
 }
+
+// DeleteTahorPayment removes a unit's payment for the given cycle
+func (d *DB) DeleteTahorPayment(cycleID, unit string) error {
+	key := cycleID + ":" + unit
+	return d.bolt.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(tahorPaymentsBucket))
+		return b.Delete([]byte(key))
+	})
+}

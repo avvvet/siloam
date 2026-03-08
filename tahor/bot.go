@@ -60,7 +60,6 @@ func New(cfg *config.Config, database *db.DB) (*Bot, error) {
 
 func (b *Bot) Start() {
 	b.startScheduler()
-	//b.StartPreDrawReminders() // send reminder immediately if draw not done yet
 
 	// Uncomment to post intro once
 	// b.sendToGroup(introMessage + footer)
@@ -127,6 +126,12 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	// /balance
 	if strings.EqualFold(text, "/balance") {
 		b.handleBalance(msg)
+		return
+	}
+
+	// tahor reset a
+	if unit, ok := parseTahorReset(text); ok {
+		b.handleResetPayment(msg, unit)
 		return
 	}
 
@@ -318,6 +323,21 @@ func (b *Bot) handleBalance(msg *tgbotapi.Message) {
 	ledger, _ := b.db.GetTahorLedger(cycle.ID)
 
 	b.replyMarkdown(msg, buildBalance(payments, ledger)+footer)
+}
+
+func (b *Bot) handleResetPayment(msg *tgbotapi.Message, unit string) {
+	cycle, err := b.db.GetTahorCycle()
+	if err != nil || cycle == nil || !cycle.Active {
+		return
+	}
+
+	if err := b.db.DeleteTahorPayment(cycle.ID, unit); err != nil {
+		b.replyMarkdown(msg, "❌ ክፍያ ማስወገድ አልተቻለም።"+footer)
+		return
+	}
+
+	payments, _ := b.db.GetTahorPayments(cycle.ID)
+	b.sendToGroup(fmt.Sprintf("🔄 *ቤት %s* ክፍያ ተሰርዟል።\n\n%s%s", strings.ToUpper(unit), buildPaymentSummary(payments), footer))
 }
 
 func (b *Bot) sendDMReply(chatID int64) {

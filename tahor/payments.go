@@ -14,6 +14,16 @@ var allUnits = []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "
 
 const fundAmount = 600.0
 
+// parseTahorReset parses "tahor reset a" format
+func parseTahorReset(text string) (string, bool) {
+	re := regexp.MustCompile(`(?i)^tahor\s+reset\s+([a-p])`)
+	m := re.FindStringSubmatch(strings.TrimSpace(text))
+	if m == nil {
+		return "", false
+	}
+	return strings.ToLower(m[1]), true
+}
+
 // parseTahorPayment parses "tahor a=600" format
 func parseTahorPayment(text string) (string, float64, bool) {
 	re := regexp.MustCompile(`(?i)^tahor\s+([a-p])\s*=\s*(\d+(?:\.\d+)?)`)

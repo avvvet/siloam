@@ -15,7 +15,7 @@ run-tahor: build
 	./$(APP) -bot=tahor
 
 backup:
-	cp siloam.db siloam_backup_$(shell date +%Y%m%d).db && echo "Backup created: siloam_backup_$(shell date +%Y%m%d).db"
+	cp siloam.db siloam_backup_$(shell date +%Y%m%d).db && cp tahor.db tahor_backup_$(shell date +%Y%m%d).db && echo "Backup created for both databases"
 
 clean:
 	rm -f $(APP)
