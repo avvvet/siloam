@@ -60,9 +60,10 @@ func New(cfg *config.Config, database *db.DB) (*Bot, error) {
 
 func (b *Bot) Start() {
 	b.startScheduler()
+	b.StartPreDrawReminders() // send reminder immediately if draw not done yet
 
 	// Uncomment to post intro once
-	b.sendToGroup(introMessage + footer)
+	// b.sendToGroup(introMessage + footer)
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60

@@ -11,28 +11,28 @@ import (
 )
 
 var preDrawReminders = []string{
-	`📢 *ትኩረት!* ነገ እሁድ ከቀኑ 9 ሰዓት ላይ *አብሮ የጽዳት አስተዳደሩን የሚረዳኝ ቤት ዕጣ ይወጣል!*
+	`📢 *ትኩረት!* ዛሬ እሁድ ከቀኑ 9 ሰዓት ላይ *አብሮ የጽዳት አስተዳደሩን የሚረዳኝ ቤት ዕጣ ይወጣል!*
 
 🧹 የጋራ መወጣጫ እና የመግቢያ ቦታ ጽዳት ለሁላችንም ጤና እና ምቾት አስፈላጊ ነው።
 💰 በወር 200 ብር ብቻ — ሁሉም ቤት ለጋራ ጽዳት አስተዋጽኦ ያደርጋል።
 👤 ዕጣ የወጣለት ቤት አካውንት ቁጥር ብቻ ያጋራል — እኔ ታሆር በዋናነት ሥራውን አግዛለሁ!
 ለሁላችን ንጹህ እና ምቹ አፓርታማ! 🏠`,
 
-	`📢 *ትኩረት!* ነገ እሁድ ከቀኑ 9 ሰዓት ላይ *አብሮ የጽዳት አስተዳደሩን የሚረዳኝ ቤት ዕጣ ይወጣል!*
+	`📢 *ትኩረት!* ዛሬ እሁድ ከቀኑ 9 ሰዓት ላይ *አብሮ የጽዳት አስተዳደሩን የሚረዳኝ ቤት ዕጣ ይወጣል!*
 
 🏠 ንጹህ አፓርታማ የሁላችንም ኩራት ነው።
 💰 በወር 200 ብር — ትንሽ መዋጮ፣ ትልቅ ለውጥ!
-👤 ዕጣ የወጣለት ቤት አካውንት ብቻ ያጋራል — እኔ ታሆር ቀሪውን እሠራለሁ!
+👤 ዕጣ የወጣለት ቤት አካውንት ብቻ ያጋራል — እኔ ታሆር ሁሉንም እሠራለሁ!
 አብረን እናድርገው! 💪`,
 
-	`📢 *ትኩረት!* ነገ እሁድ ከቀኑ 9 ሰዓት ላይ *አብሮ የጽዳት አስተዳደሩን የሚረዳኝ ቤት ዕጣ ይወጣል!*
+	`📢 *ትኩረት!* ዛሬ እሁድ ከቀኑ 9 ሰዓት ላይ *አብሮ የጽዳት አስተዳደሩን የሚረዳኝ ቤት ዕጣ ይወጣል!*
 
 ✨ ንጹህ ደረጃ እና መግቢያ — ለእያንዳንዱ ቤተሰብ የሚሰጥ ስጦታ ነው።
 💰 16 ቤቶች አንድ ላይ ሲሆኑ 200 ብር ብቻ በቂ ነው!
 👤 የተመረጠው ቤት አካውንት ይሰጣል — እኔ ታሆር ክፍያውን እከታተላለሁ!
-ለንጹህ ቤታችን አንድ እንሁን! 🤝`,
+ለንጹህ አፓርታማ አንድ እንሁን! 🤝`,
 
-	`📢 *ትኩረት!* ነገ እሁድ ከቀኑ 9 ሰዓት ላይ *አብሮ የጽዳት አስተዳደሩን የሚረዳኝ ቤት ዕጣ ይወጣል!*
+	`📢 *ትኩረት!* ዛሬ እሁድ ከቀኑ 9 ሰዓት ላይ *አብሮ የጽዳት አስተዳደሩን የሚረዳኝ ቤት ዕጣ ይወጣል!*
 
 🧹 ጽዱ ደረጃ — ደስተኛ ጎረቤቶች!
 💰 200 ብር በወር — ቡና ዋጋ ነው፣ ግን ለሁላችን ለውጥ ያመጣል!
@@ -44,8 +44,8 @@ func (b *Bot) startScheduler() {
 	loc, _ := time.LoadLocation("Europe/Moscow")
 	c := cron.New(cron.WithLocation(loc))
 
-	// Every 2 hours on March 7 — pre-draw reminder
-	c.AddFunc("0 */2 7 3 *", func() {
+	// Every 2 hours on March 7 and 8 before draw — pre-draw reminder
+	c.AddFunc("0 */2 7,8 3 *", func() {
 		b.sendPreDrawReminder()
 	})
 
@@ -76,6 +76,15 @@ func (b *Bot) sendPreDrawReminder() {
 	rand.Seed(time.Now().UnixNano())
 	msg := preDrawReminders[rand.Intn(len(preDrawReminders))]
 	b.sendToGroup(msg + footer)
+}
+
+// StartPreDrawReminders sends immediate reminder and schedules every 2 hours until draw
+func (b *Bot) StartPreDrawReminders() {
+	cycle, _ := b.db.GetTahorCycle()
+	if cycle != nil && cycle.Active {
+		return
+	}
+	b.sendPreDrawReminder()
 }
 
 func (b *Bot) remindDelegateAccount() {
