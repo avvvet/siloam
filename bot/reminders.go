@@ -48,8 +48,8 @@ func (b *Bot) startScheduler() {
 		b.finalizeBill()
 	})
 
-	// Every 4 hours — payment reminder
-	c.AddFunc("0 */4 * * *", func() {
+	// Water bill payment reminder — 10AM and 8PM
+	c.AddFunc("0 10,20 * * *", func() {
 		b.sendPaymentReminder()
 	})
 

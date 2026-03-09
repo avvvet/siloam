@@ -59,8 +59,8 @@ func (b *Bot) startScheduler() {
 		b.remindDelegateAccount()
 	})
 
-	// Every 4 hours — remind units to pay fund if not all paid
-	c.AddFunc("30 */4 * * *", func() {
+	// Fund payment reminder — 10:30AM and 8:30PM
+	c.AddFunc("30 10,20 * * *", func() {
 		b.remindFundPayment()
 	})
 
