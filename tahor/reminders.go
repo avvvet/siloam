@@ -60,7 +60,7 @@ func (b *Bot) startScheduler() {
 	})
 
 	// Every 4 hours — remind units to pay fund if not all paid
-	c.AddFunc("0 */4 * * *", func() {
+	c.AddFunc("30 */4 * * *", func() {
 		b.remindFundPayment()
 	})
 

@@ -11,7 +11,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const footer = "\n\n— Siloam"
+const footer = "\n\n— Siloam | Water Bill Manager"
 
 type Bot struct {
 	api *tgbotapi.BotAPI

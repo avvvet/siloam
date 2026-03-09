@@ -135,7 +135,12 @@ func buildPaymentSummary(payments map[string]*db.TahorPayment) string {
 		sb.WriteString(fmt.Sprintf("\n❌ *ያልከፈሉ:* %s\n", strings.Join(pendingList, ", ")))
 	}
 
+	totalCollected := 0.0
+	for _, p := range payments {
+		totalCollected += p.Amount
+	}
 	sb.WriteString(fmt.Sprintf("\n*ከፍለዋል: %d/16 | ይቀራቸዋል: %d*", len(paidList), len(pendingList)))
+	sb.WriteString(fmt.Sprintf("\n💰 *እስካሁን የተሰበሰበ: %.0f ብር*", totalCollected))
 	return sb.String()
 }
 

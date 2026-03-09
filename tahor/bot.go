@@ -12,7 +12,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const footer = "\n\n— ታሆር"
+const footer = "\n\n— Tahor | Cleaning Fund Manager"
 
 const introMessage = `የጽዳት ጉዳይ ላይ አስተያየታችሁን እንድትሰጡ ተጠይቃችሁ ነበር፣ ምላሽ ባለመገኘቱ — እኔ ታሆር ለመፍትሄ ተሰይሜያለሁ!
 
