@@ -34,6 +34,9 @@ func (b *Bot) Start() {
 	// Uncomment to greet on every startup
 	// b.sendIntro(b.cfg.GroupID)
 
+	// Uncomment once to post manual bill collected message, then comment back
+	// b.sendManualBillMessage()
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := b.api.GetUpdatesChan(u)
@@ -96,7 +99,6 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	if payments := parsePayments(text); len(payments) > 0 {
 		bill, _ := b.db.GetBill()
 		if bill == nil || !bill.Finalized {
-			// Bill not finalized yet — silently ignore
 			return
 		}
 		b.handlePayments(msg, payments)
@@ -107,7 +109,6 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	if parsed := parseReadings(text); len(parsed) > 0 {
 		bill, _ := b.db.GetBill()
 		if bill != nil {
-			// Bill has been set, readings are closed — silently ignore
 			return
 		}
 		b.handleReadings(msg, parsed)
@@ -145,8 +146,6 @@ func (b *Bot) handleReadings(msg *tgbotapi.Message, parsed map[string]int) {
 		return
 	}
 
-	b.replyMarkdown(msg, fmt.Sprintf("*Recorded:*\n%s%s", strings.Join(confirmed, "\n"), footer))
-
 	readings, err := b.db.GetAllReadings()
 	if err != nil {
 		return
@@ -160,14 +159,12 @@ func (b *Bot) handleReadings(msg *tgbotapi.Message, parsed map[string]int) {
 }
 
 func (b *Bot) handleBillCommand(msg *tgbotapi.Message, amount float64) {
-	// Check all readings submitted
 	readings, err := b.db.GetAllReadings()
 	if err != nil || !allSubmitted(readings) {
 		b.replyMarkdown(msg, "⚠️ Cannot post bill yet — not all 16 readings submitted."+footer)
 		return
 	}
 
-	// Save bill (not finalized yet, finalized at midnight)
 	bill := &db.Bill{
 		TotalBill: amount,
 		Units:     make(map[string]float64),
@@ -190,12 +187,12 @@ func (b *Bot) handleBillCommand(msg *tgbotapi.Message, amount float64) {
 func (b *Bot) handlePayments(msg *tgbotapi.Message, payments map[string]float64) {
 	bill, err := b.db.GetBill()
 	if err != nil || bill == nil || !bill.Finalized {
-		return // silently ignore if bill not finalized
+		return
 	}
 
 	var confirmed []string
 	for unit, amount := range payments {
-		owed := bill.Units[unit]
+		owed := bill.Units[unit] + bill.AdditionalFee
 		if amount < owed {
 			confirmed = append(confirmed, fmt.Sprintf("❌ *%s:* %.0f Birr is less than owed %.0f Birr", strings.ToUpper(unit), amount, owed))
 			continue
@@ -213,7 +210,7 @@ func (b *Bot) handlePayments(msg *tgbotapi.Message, payments map[string]float64)
 	}
 
 	if len(confirmed) > 0 {
-		b.replyMarkdown(msg, fmt.Sprintf("*Payment Recorded:*\n%s%s", strings.Join(confirmed, "\n"), footer))
+		b.replyMarkdown(msg, fmt.Sprintf("*Payment:*\n%s%s", strings.Join(confirmed, "\n"), footer))
 	}
 
 	allPayments, err := b.db.GetAllPayments()
@@ -226,10 +223,23 @@ func (b *Bot) handlePayments(msg *tgbotapi.Message, payments map[string]float64)
 	// All paid
 	if allPaid(allPayments, bill.Units, bill.AdditionalFee) {
 		b.sendToGroup(fmt.Sprintf(
-			"🎊 *All payments received!*\n\nThis month's water bill has ended.\nPlease pay *%.0f Birr* to the water authority today.\n\nSee you next month! 💧%s",
+			"✅ *የዚህ ወር የውሃ ክፍያ ሙሉ በሙሉ ተሰብስቧል!*\n\n"+
+				"💰 *የሚከፈለው መጠን: %.0f ብር*\n\n"+
+				"እባክዎ ለውሃ ባለስልጣን ክፍያ ሲፈጽሙ ደረሰኝ እዚህ ግሩፕ ላይ ይለጥፉ።\n"+
+				"*(የኤሌክትሪክ ለፓምፕ 800 ብር ሲከፈልም ደረሰኝ እዚህ ይለጥፉ።)*\n\n"+
+				"እናመሰግናለን! 🙏%s",
 			bill.TotalBill, footer,
 		))
 	}
+}
+
+func (b *Bot) sendManualBillMessage() {
+	text := "✅ *የዚህ ወር የውሃ ክፍያ ሙሉ በሙሉ ተሰብስቧል!*\n\n" +
+		"💰 *የሚከፈለው መጠን: 18,118 ብር*\n\n" +
+		"እባክዎ ለውሃ ባለስልጣን ክፍያ ሲፈጽሙ ደረሰኝ እዚህ ግሩፕ ላይ ይለጥፉ።\n" +
+		"*(የኤሌክትሪክ ለፓምፕ 800 ብር ሲከፈልም ደረሰኝ እዚህ ይለጥፉ።)*\n\n" +
+		"እናመሰግናለን! 🙏"
+	b.sendToGroup(text)
 }
 
 func (b *Bot) sendStatus(msg *tgbotapi.Message) {
