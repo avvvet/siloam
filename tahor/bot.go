@@ -253,7 +253,7 @@ func (b *Bot) handleTahorStart(msg *tgbotapi.Message) {
 		"🧹 *የጽዳት አገልግሎት ተጀምሯል!*\n\n" +
 			"📅 ጽዳት: ረቡዕ እና ቅዳሜ — በወር 8 ጊዜ\n" +
 			"📊 ጠቅላላ: 16 ክፍለ ጊዜ\n\n" +
-			"ጽዳቱ ሲጠናቀቅ: `tahor cleaned 1` ይጻፉ" + footer)
+			"ጽዳቱ ሲጠናቀቅ: tahor cleaned 1 ይጻፉ" + footer)
 }
 
 func (b *Bot) handleTahorEnd(msg *tgbotapi.Message) {
