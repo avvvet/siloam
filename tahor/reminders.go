@@ -16,7 +16,7 @@ var preDrawReminders = []string{
 🧹 የጋራ መወጣጫ እና የመግቢያ ቦታ ጽዳት ለሁላችንም ጤና እና ምቾት አስፈላጊ ነው።
 💰 በወር 200 ብር ብቻ — ሁሉም ቤት ለጋራ ጽዳት አስተዋጽኦ ያደርጋል።
 👤 ዕጣ የወጣለት ቤት አካውንት ቁጥር ብቻ ያጋራል — እኔ ታሆር በዋናነት ሥራውን አግዛለሁ!
-ለሁላችን ንጹህ እና ምቹ አፓርታማ! 🏠`,
+ለሁላችን ንጹህ እና ምቻ አፓርታማ! 🏠`,
 
 	`📢 *ትኩረት!* ነገ እሁድ ከቀኑ 9 ሰዓት ላይ *አብሮ የጽዳት አስተዳደሩን የሚረዳኝ ቤት ዕጣ ይወጣል!*
 
@@ -54,8 +54,8 @@ func (b *Bot) startScheduler() {
 		b.runDraw()
 	})
 
-	// Every 1 hour — remind delegate to submit account if not done
-	c.AddFunc("0 * * * *", func() {
+	// Account reminder — 10AM and 8PM offset by 30min
+	c.AddFunc("0 10,20 * * *", func() {
 		b.remindDelegateAccount()
 	})
 
@@ -64,11 +64,20 @@ func (b *Bot) startScheduler() {
 		b.remindFundPayment()
 	})
 
+	// 12PM Wednesday and Saturday — cleaning day reminder
+	c.AddFunc("0 12 * * 3,6", func() {
+		b.cleaningDayReminder()
+	})
+
+	// 12PM Mon, Tue, Thu, Fri, Sun — missed cleaning reminder
+	c.AddFunc("0 12 * * 0,1,2,4,5", func() {
+		b.missedCleaningReminder()
+	})
+
 	c.Start()
 }
 
 func (b *Bot) sendPreDrawReminder() {
-	// Only send if draw has not happened yet
 	cycle, _ := b.db.GetTahorCycle()
 	if cycle != nil && cycle.Active {
 		return
@@ -78,7 +87,6 @@ func (b *Bot) sendPreDrawReminder() {
 	b.sendToGroup(msg + footer)
 }
 
-// StartPreDrawReminders sends immediate reminder and schedules every 2 hours until draw
 func (b *Bot) StartPreDrawReminders() {
 	cycle, _ := b.db.GetTahorCycle()
 	if cycle != nil && cycle.Active {
@@ -129,6 +137,50 @@ func (b *Bot) remindFundPayment() {
 		totalCollected,
 		footer,
 	))
+}
+
+func (b *Bot) cleaningDayReminder() {
+	cycle, err := b.db.GetTahorCycle()
+	if err != nil || cycle == nil || !cycle.CleanerActive {
+		return
+	}
+	sessions, _ := b.db.GetCleaningSessions(cycle.ID)
+	nextExpected := len(sessions) + 1
+	if nextExpected > totalCleaningSessions {
+		return
+	}
+	b.sendToGroup(fmt.Sprintf(
+		"🧹 *ዛሬ የጽዳት ቀን ነው!*\n\nጽዳቱ ሲጠናቀቅ: `tahor cleaned %d` ይጻፉ%s",
+		nextExpected, footer))
+}
+
+func (b *Bot) missedCleaningReminder() {
+	cycle, err := b.db.GetTahorCycle()
+	if err != nil || cycle == nil || !cycle.CleanerActive {
+		return
+	}
+
+	// Only fire if last scheduled day was not confirmed
+	loc, _ := time.LoadLocation("Europe/Moscow")
+	now := time.Now().In(loc)
+	weekday := now.Weekday()
+	if weekday == time.Wednesday || weekday == time.Saturday {
+		return
+	}
+
+	sessions, _ := b.db.GetCleaningSessions(cycle.ID)
+	nextExpected := len(sessions) + 1
+	if nextExpected > totalCleaningSessions {
+		return
+	}
+
+	// Check if previous scheduled day was confirmed
+	prevSession := nextExpected - 1
+	if prevSession > 0 && !b.db.IsSessionConfirmed(cycle.ID, prevSession) {
+		b.sendToGroup(fmt.Sprintf(
+			"⚠️ *ክፍለ ጊዜ %d እንደተፈጸመ አልተረጋገጠም።*\nጽዳቱ ከተጠናቀቀ: `tahor cleaned %d` ይጻፉ%s",
+			nextExpected, nextExpected, footer))
+	}
 }
 
 func (b *Bot) sendToGroup(text string) {

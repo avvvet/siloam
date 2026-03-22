@@ -14,6 +14,8 @@ import (
 
 const footer = "\n\n— Tahor | Cleaning Fund Manager"
 
+const totalCleaningSessions = 16
+
 const introMessage = `የጽዳት ጉዳይ ላይ አስተያየታችሁን እንድትሰጡ ተጠይቃችሁ ነበር፣ ምላሽ ባለመገኘቱ — እኔ ታሆር ለመፍትሄ ተሰይሜያለሁ!
 
 👋 *ሰላም የአፓርታማ ቤተሰቦች!*
@@ -105,27 +107,39 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		return
 	}
 
-	// /startcleaner
-	if strings.EqualFold(text, "/startcleaner") {
-		b.handleStartCleaner(msg)
-		return
-	}
-
-	// /paidcleaner
-	if amount, ok := parsePaidCleaner(text); ok {
-		b.handlePaidCleaner(msg, amount)
-		return
-	}
-
-	// /paidmaterials
-	if amount, ok := parsePaidMaterials(text); ok {
-		b.handlePaidMaterials(msg, amount)
-		return
-	}
-
 	// /balance
 	if strings.EqualFold(text, "/balance") {
 		b.handleBalance(msg)
+		return
+	}
+
+	// tahor start
+	if parseTahorStart(text) {
+		b.handleTahorStart(msg)
+		return
+	}
+
+	// tahor end
+	if parseTahorEnd(text) {
+		b.handleTahorEnd(msg)
+		return
+	}
+
+	// tahor cleaned 3
+	if session, ok := parseCleanedCommand(text); ok {
+		b.handleCleaned(msg, session)
+		return
+	}
+
+	// tahor reset cleaned 3
+	if session, ok := parseResetCleaned(text); ok {
+		b.handleResetCleaned(msg, session)
+		return
+	}
+
+	// tahor expense 3000 reason
+	if amount, reason, ok := parseTahorExpense(text); ok {
+		b.handleExpense(msg, amount, reason)
 		return
 	}
 
@@ -150,12 +164,10 @@ func (b *Bot) runDraw() {
 		usedUnits = cycle.UsedUnits
 	}
 
-	// Reset if all 16 used
 	if len(usedUnits) >= 16 {
 		usedUnits = []string{}
 	}
 
-	// Pick random unit not in usedUnits
 	available := []string{}
 	for _, u := range allUnits {
 		used := false
@@ -173,7 +185,6 @@ func (b *Bot) runDraw() {
 	rand.Seed(time.Now().UnixNano())
 	selected := available[rand.Intn(len(available))]
 
-	// Save new cycle
 	cycleID := fmt.Sprintf("%s-C%d", time.Now().Format("2006"), len(usedUnits)+1)
 	newCycle := &db.TahorCycle{
 		ID:        cycleID,
@@ -183,7 +194,6 @@ func (b *Bot) runDraw() {
 	}
 	b.db.SaveTahorCycle(newCycle)
 
-	// Save delegate
 	delegate := &db.TahorDelegate{
 		Unit:     selected,
 		CycleID:  cycleID,
@@ -218,8 +228,6 @@ func (b *Bot) handleDecline(msg *tgbotapi.Message, reason string) {
 		return
 	}
 
-	// Only the selected delegate can decline
-	// (we check by unit — in real use member would include their unit)
 	delegate.Declined = true
 	b.db.SaveTahorDelegate(delegate)
 
@@ -228,29 +236,107 @@ func (b *Bot) handleDecline(msg *tgbotapi.Message, reason string) {
 		strings.ToUpper(delegate.Unit), reason, footer,
 	))
 
-	// Re-run draw
 	b.runDraw()
 }
 
-func (b *Bot) handleStartCleaner(msg *tgbotapi.Message) {
+func (b *Bot) handleTahorStart(msg *tgbotapi.Message) {
 	cycle, err := b.db.GetTahorCycle()
 	if err != nil || cycle == nil {
-		return
-	}
-
-	payments, _ := b.db.GetTahorPayments(cycle.ID)
-	if !allPaid(payments) {
-		b.replyMarkdown(msg, "⚠️ ገና 16ቱም ቤቶች አልከፈሉም። ሁሉም ከፍለው ሲጠናቀቅ ይሞክሩ።"+footer)
+		b.replyMarkdown(msg, "⚠️ ምንም ዑደት አልተጀመረም።"+footer)
 		return
 	}
 
 	cycle.CleanerActive = true
 	b.db.SaveTahorCycle(cycle)
 
+	b.sendToGroup(
+		"🧹 *የጽዳት አገልግሎት ተጀምሯል!*\n\n" +
+			"📅 ጽዳት: ረቡዕ እና ቅዳሜ — በወር 8 ጊዜ\n" +
+			"📊 ጠቅላላ: 16 ክፍለ ጊዜ\n\n" +
+			"ጽዳቱ ሲጠናቀቅ: `tahor cleaned 1` ይጻፉ" + footer)
+}
+
+func (b *Bot) handleTahorEnd(msg *tgbotapi.Message) {
+	cycle, err := b.db.GetTahorCycle()
+	if err != nil || cycle == nil {
+		return
+	}
+
+	sessions, _ := b.db.GetCleaningSessions(cycle.ID)
+	payments, _ := b.db.GetTahorPayments(cycle.ID)
+	ledger, _ := b.db.GetTahorLedger(cycle.ID)
+
 	b.sendToGroup(fmt.Sprintf(
-		"🧹 *የጽዳት አገልግሎት ተጀምሯል!*\n\nረዳት ቤት %s ክፍያ ሲፈጽሙ:\n`/paidcleaner 3000` — ለጽዳት ሠራተኛ\n`/paidmaterials 200` — ለጽዳት ዕቃ\n\nሒሳብ ለማየት: `/balance`%s",
-		strings.ToUpper(cycle.UsedUnits[len(cycle.UsedUnits)-1]), footer,
-	))
+		"✅ *የጽዳት አገልግሎት ተጠናቋል!*\n\n"+
+			"🧹 *የጸዳ ክፍለ ጊዜ:* %d/%d\n\n"+
+			"%s\n\n"+
+			"እናመሰግናለን! 🙏%s",
+		len(sessions), totalCleaningSessions, buildBalance(payments, ledger), footer))
+}
+
+func (b *Bot) handleCleaned(msg *tgbotapi.Message, session int) {
+	cycle, err := b.db.GetTahorCycle()
+	if err != nil || cycle == nil || !cycle.CleanerActive {
+		return
+	}
+
+	if session > totalCleaningSessions {
+		b.replyMarkdown(msg, fmt.Sprintf("⚠️ ክፍለ ጊዜ %d የለም። ጠቅላላ ክፍለ ጊዜ %d ነው።%s", session, totalCleaningSessions, footer))
+		return
+	}
+
+	if b.db.IsSessionConfirmed(cycle.ID, session) {
+		b.replyMarkdown(msg, fmt.Sprintf("ℹ️ ክፍለ ጊዜ %d አስቀድሞ ተረጋግጧል!%s", session, footer))
+		return
+	}
+
+	sessions, _ := b.db.GetCleaningSessions(cycle.ID)
+	nextExpected := len(sessions) + 1
+
+	if session != nextExpected {
+		b.replyMarkdown(msg, fmt.Sprintf("⚠️ አሁን የሚጠበቀው ክፍለ ጊዜ %d ነው። `tahor cleaned %d` ይጻፉ%s", nextExpected, nextExpected, footer))
+		return
+	}
+
+	b.db.SaveCleaningSession(cycle.ID, session)
+	sessions, _ = b.db.GetCleaningSessions(cycle.ID)
+
+	if session == totalCleaningSessions {
+		b.sendToGroup(fmt.Sprintf("🎉 *ክፍለ ጊዜ %d/%d ተረጋግጧል!*\n\nሁሉም ክፍለ ጊዜዎች ተጠናቅቀዋል! `tahor end` ይጻፉ%s", session, totalCleaningSessions, footer))
+	} else {
+		next := session + 1
+		b.sendToGroup(fmt.Sprintf("✅ *ክፍለ ጊዜ %d/%d ተረጋግጧል!*\n\nክፍለ ጊዜ %d ሲጠናቀቅ: `tahor cleaned %d` ይጻፉ%s", session, totalCleaningSessions, next, next, footer))
+	}
+}
+
+func (b *Bot) handleResetCleaned(msg *tgbotapi.Message, session int) {
+	cycle, err := b.db.GetTahorCycle()
+	if err != nil || cycle == nil {
+		return
+	}
+
+	if !b.db.IsSessionConfirmed(cycle.ID, session) {
+		b.replyMarkdown(msg, fmt.Sprintf("ℹ️ ክፍለ ጊዜ %d ተረጋግጦ አልነበረም።%s", session, footer))
+		return
+	}
+
+	b.db.DeleteCleaningSession(cycle.ID, session)
+	sessions, _ := b.db.GetCleaningSessions(cycle.ID)
+	nextExpected := len(sessions) + 1
+	b.sendToGroup(fmt.Sprintf("🔄 *ክፍለ ጊዜ %d ተሰርዟል።* አሁን የሚጠበቀው ክፍለ ጊዜ %d ነው።%s", session, nextExpected, footer))
+}
+
+func (b *Bot) handleExpense(msg *tgbotapi.Message, amount float64, reason string) {
+	cycle, err := b.db.GetTahorCycle()
+	if err != nil || cycle == nil {
+		return
+	}
+
+	b.db.AddTahorLedgerEntry(cycle.ID, reason, amount)
+
+	payments, _ := b.db.GetTahorPayments(cycle.ID)
+	ledger, _ := b.db.GetTahorLedger(cycle.ID)
+	b.sendToGroup(fmt.Sprintf("📤 *%.0f ብር (%s) ወጪ ተመዝግቧል!*\n\n%s%s", amount, reason, buildBalance(payments, ledger), footer))
 }
 
 func (b *Bot) handleFundPayment(msg *tgbotapi.Message, unit string, amount float64) {
@@ -261,7 +347,7 @@ func (b *Bot) handleFundPayment(msg *tgbotapi.Message, unit string, amount float
 
 	delegate, _ := b.db.GetTahorDelegate()
 	if delegate == nil || delegate.Account == "" {
-		return // wait for account first
+		return
 	}
 
 	if amount < fundAmount {
@@ -278,38 +364,10 @@ func (b *Bot) handleFundPayment(msg *tgbotapi.Message, unit string, amount float
 		cycle.FundCollected = true
 		b.db.SaveTahorCycle(cycle)
 		b.sendToGroup(fmt.Sprintf(
-			"🎊 *16ቱም ቤቶች ከፍለዋል!*\n\nጠቅላላ 9,600 ብር ተሰብስቧል።\n\nረዳት ቤት %s እባክዎ የጽዳት ሠራተኛ አስጀምሩ እና ሲጀምሩ:\n`/startcleaner` ይጻፉ%s",
+			"🎊 *16ቱም ቤቶች ከፍለዋል!*\n\nጠቅላላ 9,600 ብር ተሰብስቧል።\n\nረዳት ቤት %s እባክዎ የጽዳት ሠራተኛ ሲጀምሩ:\n`tahor start` ይጻፉ%s",
 			strings.ToUpper(delegate.Unit), footer,
 		))
 	}
-}
-
-func (b *Bot) handlePaidCleaner(msg *tgbotapi.Message, amount float64) {
-	cycle, err := b.db.GetTahorCycle()
-	if err != nil || cycle == nil || !cycle.CleanerActive {
-		return
-	}
-
-	b.db.AddTahorLedgerEntry(cycle.ID, "cleaner", amount)
-
-	payments, _ := b.db.GetTahorPayments(cycle.ID)
-	ledger, _ := b.db.GetTahorLedger(cycle.ID)
-
-	b.sendToGroup(fmt.Sprintf("✅ *ለጽዳት ሠራተኛ %.0f ብር ተከፍሏል!*\n\n%s%s", amount, buildBalance(payments, ledger), footer))
-}
-
-func (b *Bot) handlePaidMaterials(msg *tgbotapi.Message, amount float64) {
-	cycle, err := b.db.GetTahorCycle()
-	if err != nil || cycle == nil || !cycle.CleanerActive {
-		return
-	}
-
-	b.db.AddTahorLedgerEntry(cycle.ID, "materials", amount)
-
-	payments, _ := b.db.GetTahorPayments(cycle.ID)
-	ledger, _ := b.db.GetTahorLedger(cycle.ID)
-
-	b.sendToGroup(fmt.Sprintf("✅ *ለጽዳት ዕቃ %.0f ብር ተከፍሏል!*\n\n%s%s", amount, buildBalance(payments, ledger), footer))
 }
 
 func (b *Bot) handleBalance(msg *tgbotapi.Message) {
@@ -321,8 +379,13 @@ func (b *Bot) handleBalance(msg *tgbotapi.Message) {
 
 	payments, _ := b.db.GetTahorPayments(cycle.ID)
 	ledger, _ := b.db.GetTahorLedger(cycle.ID)
+	sessions, _ := b.db.GetCleaningSessions(cycle.ID)
 
-	b.replyMarkdown(msg, buildBalance(payments, ledger)+footer)
+	text := buildBalance(payments, ledger)
+	if cycle.CleanerActive {
+		text += fmt.Sprintf("\n\n🧹 *የጸዳ ክፍለ ጊዜ:* %d/%d", len(sessions), totalCleaningSessions)
+	}
+	b.replyMarkdown(msg, text+footer)
 }
 
 func (b *Bot) handleResetPayment(msg *tgbotapi.Message, unit string) {

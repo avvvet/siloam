@@ -144,29 +144,94 @@ func buildPaymentSummary(payments map[string]*db.TahorPayment) string {
 	return sb.String()
 }
 
-// buildBalance builds the balance summary
+// buildBalance builds the balance summary deducting all expenses
 func buildBalance(payments map[string]*db.TahorPayment, ledger []*db.TahorLedger) string {
-	var totalCollected, totalCleaner, totalMaterials float64
+	var totalCollected, totalExpenses float64
 
 	for _, p := range payments {
 		totalCollected += p.Amount
 	}
-	for _, e := range ledger {
-		if e.Type == "cleaner" {
-			totalCleaner += e.Amount
-		} else if e.Type == "materials" {
-			totalMaterials += e.Amount
+
+	var sb strings.Builder
+	sb.WriteString("📊 *የጽዳት ፈንድ ሂሳብ*\n\n")
+	sb.WriteString(fmt.Sprintf("📥 የተሰበሰበ: *%.0f ብር*\n", totalCollected))
+
+	if len(ledger) > 0 {
+		sb.WriteString("\n📤 *ወጪዎች:*\n")
+		for _, e := range ledger {
+			sb.WriteString(fmt.Sprintf("  — %s: *%.0f ብር*\n", e.Type, e.Amount))
+			totalExpenses += e.Amount
 		}
 	}
 
-	balance := totalCollected - totalCleaner - totalMaterials
+	balance := totalCollected - totalExpenses
+	sb.WriteString(fmt.Sprintf("\n💰 *ቀሪ ሂሳብ: %.0f ብር*", balance))
+	return sb.String()
+}
 
-	return fmt.Sprintf(
-		"📊 *የጽዳት ፈንድ ሂሳብ*\n\n"+
-			"📥 የተሰበሰበ: *%.0f ብር*\n"+
-			"📤 ለጽዳት ሠራተኛ የተከፈለ: *%.0f ብር*\n"+
-			"📤 ለጽዳት ዕቃ የተከፈለ: *%.0f ብር*\n"+
-			"💰 *ቀሪ ሂሳብ: %.0f ብር*",
-		totalCollected, totalCleaner, totalMaterials, balance,
-	)
+// parseCleanedCommand parses "tahor cleaned 3"
+func parseCleanedCommand(text string) (int, bool) {
+	re := regexp.MustCompile(`(?i)^tahor\s+cleaned\s+(\d+)`)
+	m := re.FindStringSubmatch(strings.TrimSpace(text))
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// parseResetCleaned parses "tahor reset cleaned 3"
+func parseResetCleaned(text string) (int, bool) {
+	re := regexp.MustCompile(`(?i)^tahor\s+reset\s+cleaned\s+(\d+)`)
+	m := re.FindStringSubmatch(strings.TrimSpace(text))
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// parseTahorStart parses "tahor start"
+func parseTahorStart(text string) bool {
+	return regexp.MustCompile(`(?i)^tahor\s+start$`).MatchString(strings.TrimSpace(text))
+}
+
+// parseTahorEnd parses "tahor end"
+func parseTahorEnd(text string) bool {
+	return regexp.MustCompile(`(?i)^tahor\s+end$`).MatchString(strings.TrimSpace(text))
+}
+
+// parseTahorExpense parses "tahor expense 3000 reason here"
+func parseTahorExpense(text string) (float64, string, bool) {
+	re := regexp.MustCompile(`(?i)^tahor\s+expense\s+(\d+(?:\.\d+)?)\s+(.+)`)
+	m := re.FindStringSubmatch(strings.TrimSpace(text))
+	if m == nil {
+		return 0, "", false
+	}
+	amount, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		return 0, "", false
+	}
+	return amount, strings.TrimSpace(m[2]), true
+}
+
+// buildCleaningSummary builds cleaning progress summary
+func buildCleaningSummary(sessions []int, totalSessions int) string {
+	nextExpected := len(sessions) + 1
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("🧹 *የጽዳት ሁኔታ*\n\n"))
+	sb.WriteString(fmt.Sprintf("✅ *የጸዳ:* %d/%d\n", len(sessions), totalSessions))
+	sb.WriteString(fmt.Sprintf("⏳ *የቀረ:* %d\n", totalSessions-len(sessions)))
+	if nextExpected <= totalSessions {
+		sb.WriteString(fmt.Sprintf("\n📌 *የሚጠበቀው ክፍለ ጊዜ:* %d", nextExpected))
+	} else {
+		sb.WriteString("\n🎉 *ሁሉም ክፍለ ጊዜዎች ተጠናቅቀዋል!*")
+	}
+	return sb.String()
 }

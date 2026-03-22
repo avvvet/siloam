@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -52,7 +53,7 @@ type TahorLedger struct {
 
 func (d *DB) InitTahorBuckets() error {
 	return d.bolt.Update(func(tx *bolt.Tx) error {
-		for _, bucket := range []string{tahorCycleBucket, tahorPaymentsBucket, tahorLedgerBucket, tahorDelegateBucket} {
+		for _, bucket := range []string{tahorCycleBucket, tahorPaymentsBucket, tahorLedgerBucket, tahorDelegateBucket, tahorCleaningBucket} {
 			if _, err := tx.CreateBucketIfNotExists([]byte(bucket)); err != nil {
 				return err
 			}
@@ -205,4 +206,77 @@ func (d *DB) DeleteTahorPayment(cycleID, unit string) error {
 		b := tx.Bucket([]byte(tahorPaymentsBucket))
 		return b.Delete([]byte(key))
 	})
+}
+
+// CleaningSession holds a single confirmed cleaning session
+type CleaningSession struct {
+	Session   int       `json:"session"`
+	CycleID   string    `json:"cycle_id"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+const tahorCleaningBucket = "tahor_cleaning"
+
+func (d *DB) InitCleaningBucket() error {
+	return d.bolt.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(tahorCleaningBucket))
+		return err
+	})
+}
+
+// SaveCleaningSession saves a confirmed cleaning session
+func (d *DB) SaveCleaningSession(cycleID string, session int) error {
+	key := fmt.Sprintf("%s:%d", cycleID, session)
+	entry := &CleaningSession{
+		Session:   session,
+		CycleID:   cycleID,
+		Timestamp: time.Now(),
+	}
+	return d.bolt.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(tahorCleaningBucket))
+		data, err := json.Marshal(entry)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(key), data)
+	})
+}
+
+// DeleteCleaningSession removes a cleaning session
+func (d *DB) DeleteCleaningSession(cycleID string, session int) error {
+	key := fmt.Sprintf("%s:%d", cycleID, session)
+	return d.bolt.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(tahorCleaningBucket))
+		return b.Delete([]byte(key))
+	})
+}
+
+// GetCleaningSessions returns all confirmed sessions for a cycle
+func (d *DB) GetCleaningSessions(cycleID string) ([]int, error) {
+	var sessions []int
+	err := d.bolt.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(tahorCleaningBucket))
+		prefix := []byte(cycleID + ":")
+		c := b.Cursor()
+		for k, v := c.Seek(prefix); k != nil && len(k) > len(prefix) && string(k[:len(prefix)]) == string(prefix); k, v = c.Next() {
+			var entry CleaningSession
+			if err := json.Unmarshal(v, &entry); err == nil {
+				sessions = append(sessions, entry.Session)
+			}
+		}
+		return nil
+	})
+	return sessions, err
+}
+
+// IsSessionConfirmed checks if a session is already confirmed
+func (d *DB) IsSessionConfirmed(cycleID string, session int) bool {
+	key := fmt.Sprintf("%s:%d", cycleID, session)
+	var found bool
+	d.bolt.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(tahorCleaningBucket))
+		found = b.Get([]byte(key)) != nil
+		return nil
+	})
+	return found
 }
