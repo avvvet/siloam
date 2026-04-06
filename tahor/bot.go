@@ -302,10 +302,10 @@ func (b *Bot) handleCleaned(msg *tgbotapi.Message, session int) {
 	sessions, _ = b.db.GetCleaningSessions(cycle.ID)
 
 	if session == totalCleaningSessions {
-		b.sendToGroup(fmt.Sprintf("🎉 *ክፍለ ጊዜ %d/%d ተረጋግጧል!*\n\nሁሉም ክፍለ ጊዜዎች ተጠናቅቀዋል! `tahor end` ይጻፉ%s", session, totalCleaningSessions, footer))
+		b.sendToGroup(fmt.Sprintf("🎉 *Apartment cleaning confirmed!*\n🧹 *Cleaned: %d | Remaining: 0*\n\nAll sessions complete! Post: `tahor end`%s", totalCleaningSessions, footer))
 	} else {
-		next := session + 1
-		b.sendToGroup(fmt.Sprintf("✅ *ክፍለ ጊዜ %d/%d ተረጋግጧል!*\n\nክፍለ ጊዜ %d ሲጠናቀቅ: `tahor cleaned %d` ይጻፉ%s", session, totalCleaningSessions, next, next, footer))
+		remaining := totalCleaningSessions - session
+		b.sendToGroup(fmt.Sprintf("✅ *Apartment cleaning confirmed!*\n🧹 *Cleaned: %d | Remaining: %d*%s", session, remaining, footer))
 	}
 }
 

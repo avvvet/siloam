@@ -54,7 +54,7 @@ func (b *Bot) startScheduler() {
 		b.runDraw()
 	})
 
-	// Account reminder — 10AM and 8PM offset by 30min
+	// Account reminder — 10AM and 8PM
 	c.AddFunc("0 10,20 * * *", func() {
 		b.remindDelegateAccount()
 	})
@@ -150,7 +150,7 @@ func (b *Bot) cleaningDayReminder() {
 		return
 	}
 	b.sendToGroup(fmt.Sprintf(
-		"🧹 *ዛሬ የጽዳት ቀን ነው!*\n\nጽዳቱ ሲጠናቀቅ: `tahor cleaned %d` ይጻፉ%s",
+		"🧹 *ዛሬ የአፓርታማው ጽዳት ሠራተኛ ትመጣለች!* ጽዳቱ ሲጠናቀቅ ይጻፉ: `tahor cleaned %d`%s",
 		nextExpected, footer))
 }
 
@@ -160,7 +160,6 @@ func (b *Bot) missedCleaningReminder() {
 		return
 	}
 
-	// Only fire if last scheduled day was not confirmed
 	loc, _ := time.LoadLocation("Europe/Moscow")
 	now := time.Now().In(loc)
 	weekday := now.Weekday()
@@ -174,7 +173,6 @@ func (b *Bot) missedCleaningReminder() {
 		return
 	}
 
-	// Check if previous scheduled day was confirmed
 	prevSession := nextExpected - 1
 	if prevSession > 0 && !b.db.IsSessionConfirmed(cycle.ID, prevSession) {
 		b.sendToGroup(fmt.Sprintf(
