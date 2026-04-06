@@ -14,6 +14,20 @@ import (
 // Units A to P
 var allUnits = []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"}
 
+// parseFixReading parses "/fixreading a=340, b=590" style input
+func parseFixReading(text string) (map[string]int, bool) {
+	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(text)), "/fixreading") {
+		return nil, false
+	}
+	// Remove the command prefix
+	text = strings.TrimSpace(text[len("/fixreading"):])
+	result := parseReadings(text)
+	if len(result) == 0 {
+		return nil, false
+	}
+	return result, true
+}
+
 // parseReadings parses "a=340, b=590" style input
 func parseReadings(text string) map[string]int {
 	result := make(map[string]int)

@@ -89,6 +89,12 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		return
 	}
 
+	// Handle /fixreading command — works even after bill is finalized
+	if parsed, ok := parseFixReading(text); ok {
+		b.handleFixReading(msg, parsed)
+		return
+	}
+
 	// Handle /bill command
 	if amount, ok := parseBillCommand(text); ok {
 		b.handleBillCommand(msg, amount)
@@ -116,6 +122,70 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	}
 }
 
+func (b *Bot) handleFixReading(msg *tgbotapi.Message, parsed map[string]int) {
+	// Fix each reading
+	for unit, value := range parsed {
+		if _, err := b.db.SaveReading(unit, value); err != nil {
+			log.Printf("Error fixing reading for unit %s: %v", unit, err)
+			b.replyMarkdown(msg, fmt.Sprintf("❌ Failed to fix reading for unit *%s*%s", strings.ToUpper(unit), footer))
+			return
+		}
+	}
+
+	// Get current bill to retrieve total amount
+	bill, err := b.db.GetBill()
+	if err != nil || bill == nil {
+		b.replyMarkdown(msg, "❌ No bill found to recalculate."+footer)
+		return
+	}
+
+	totalBill := bill.TotalBill
+
+	// Reset bill finalized state
+	bill.Finalized = false
+	bill.Units = make(map[string]float64)
+	bill.Diffs = make(map[string]int)
+	bill.Percents = make(map[string]float64)
+	bill.Previous = make(map[string]int)
+	bill.Current = make(map[string]int)
+	if err := b.db.SaveBill(bill); err != nil {
+		log.Printf("Error resetting bill: %v", err)
+		return
+	}
+
+	b.replyMarkdown(msg, fmt.Sprintf("🔄 *Reading fixed! Recalculating bill...*%s", footer))
+
+	// Recalculate and re-post bill
+	readings, err := b.db.GetAllReadings()
+	if err != nil {
+		return
+	}
+
+	previous, err := b.db.GetPreviousReadings()
+	if err != nil || len(previous) == 0 {
+		previous = b.cfg.PreviousReadings
+	}
+
+	computed := calculateBill(readings, previous, totalBill, b.cfg.AdditionalFee)
+	computed.Finalized = true
+
+	if err := b.db.SaveBill(computed); err != nil {
+		log.Printf("Error saving recalculated bill: %v", err)
+		return
+	}
+
+	imgPath, err := generateBillImage(computed, b.cfg.BotCreatorUsername)
+	if err != nil {
+		b.sendToGroup("❌ Error generating bill image." + footer)
+		return
+	}
+
+	photo := tgbotapi.NewPhoto(b.cfg.GroupID, tgbotapi.FilePath(imgPath))
+	photo.Caption = fmt.Sprintf("⚠️ *Bill recalculated due to reading correction*\n\n💧 *Water Bill generated*\nPlease pay within 3 days.\n\nAfter you pay please post exactly this format:\n_Example if your payment is 300 Birr, post:_\n`a=300birr`%s", footer)
+	photo.ParseMode = "Markdown"
+	b.api.Send(photo)
+}
+
 func (b *Bot) handleReadings(msg *tgbotapi.Message, parsed map[string]int) {
 	if !isSubmissionOpen() {
 		var reply string
@@ -128,8 +198,31 @@ func (b *Bot) handleReadings(msg *tgbotapi.Message, parsed map[string]int) {
 		return
 	}
 
+	// Get previous readings for validation
+	previous, err := b.db.GetPreviousReadings()
+	if err != nil || len(previous) == 0 {
+		previous = b.cfg.PreviousReadings
+	}
+
 	var confirmed []string
 	for unit, value := range parsed {
+		// Validate current reading is not less than previous
+		if prevVal, ok := previous[unit]; ok {
+			if value < prevVal {
+				b.replyMarkdown(msg, fmt.Sprintf(
+					"❌ *Unit %s* reading rejected!\nCurrent reading *%d* is less than previous reading *%d*.\nPlease check your meter and resubmit.%s",
+					strings.ToUpper(unit), value, prevVal, footer,
+				))
+				continue
+			}
+			if value == prevVal {
+				b.replyMarkdown(msg, fmt.Sprintf(
+					"⚠️ *Unit %s* reading accepted but equals previous reading *%d*.\nIf this is correct (zero usage / vacant) ignore this warning.%s",
+					strings.ToUpper(unit), prevVal, footer,
+				))
+			}
+		}
+
 		reading, err := b.db.SaveReading(unit, value)
 		if err != nil {
 			log.Printf("Error saving reading for unit %s: %v", unit, err)
