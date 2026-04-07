@@ -286,7 +286,7 @@ func (b *Bot) handlePayments(msg *tgbotapi.Message, payments map[string]float64)
 	var confirmed []string
 	for unit, amount := range payments {
 		owed := bill.Units[unit] + bill.AdditionalFee
-		if amount < owed {
+		if amount < owed-0.5 {
 			confirmed = append(confirmed, fmt.Sprintf("❌ *%s:* %.0f Birr is less than owed %.0f Birr", strings.ToUpper(unit), amount, owed))
 			continue
 		}
