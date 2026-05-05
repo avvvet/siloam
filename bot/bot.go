@@ -84,7 +84,11 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		}
 	}
 
+	// Read from text or caption (for photo messages)
 	text := strings.TrimSpace(msg.Text)
+	if text == "" {
+		text = strings.TrimSpace(msg.Caption)
+	}
 	if text == "" {
 		return
 	}
