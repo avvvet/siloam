@@ -13,7 +13,12 @@ func (b *Bot) startScheduler() {
 	loc, _ := time.LoadLocation("Europe/Moscow")
 	c := cron.New(cron.WithLocation(loc))
 
-	// 5th at 8PM — eve reminder
+	// 5th every 4 hours 8AM, 12PM, 4PM — reading day approaching reminders
+	c.AddFunc("0 8,12,16 5 * *", func() {
+		b.sendToGroup("📅 *ነገ የውሃ ቆጣሪ ቀን ነው!* እባክዎ ነገ ወቅቱን ጠብቀው ያንብቡ።")
+	})
+
+	// 5th at 8PM — eve reminder (existing)
 	c.AddFunc("0 20 5 * *", func() {
 		b.sendToGroup("📅 *Reminder:* Tomorrow is water reading day!")
 	})
