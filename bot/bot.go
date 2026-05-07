@@ -38,7 +38,7 @@ func (b *Bot) Start() {
 	// b.sendManualBillMessage()
 
 	// Uncomment on May 7 only, then comment back
-	//b.sendMay7Reminder()
+	// b.sendMay7Reminder()
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
@@ -130,7 +130,7 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 
 	// Catch wrong payment format when bill is finalized
 	bill, _ := b.db.GetBill()
-	if bill != nil && bill.Finalized {
+	if bill != nil && bill.Finalized && looksLikePayment(text) {
 		b.replyMarkdown(msg, "⚠️ ክፍያዎ አልተመዘገበም። ትክክለኛውን አጻጻፍ ይጠቀሙ።\nምሳሌ: `a=300birr`\nእባክዎ እንደገና ይላኩ።"+footer)
 		return
 	}
@@ -341,10 +341,10 @@ func (b *Bot) handlePayments(msg *tgbotapi.Message, payments map[string]float64)
 }
 
 func (b *Bot) sendMay7Reminder() {
-	text := "✅ ወቅቱን ጠብቀው ለከፈሉት ሁሉ እናመሰግናለን!\n\n" +
-		"ክፍያ ለመመዝገብ ትክክለኛውን አጻጻፍ ይጠቀሙ።\n" +
-		"ምሳሌ: `a=300birr`\n\n" +
-		"ትክክል ያልሆነ ከላኩ፣ እባክዎ በትክክለኛ አጻጻፍ እንደገና ይላኩ።"
+	text := "✅ ወቀቱን ጠበቀወ ለከፌሉት ሁሉ እናመሰጋለን!\n\n" +
+		"ክፌያ ለመመዘገብ ትክክለኛውን አጫጫፍ ይጀቀሙ።\n" +
+		"ምሳለ: `a=300birr`\n\n" +
+		"ትክክል ያልሆነ ከላኩ፣ እባክወ በትክክለኛ አጫጫፍ እንደገና ይላኩ።"
 	b.sendToGroup(text)
 }
 

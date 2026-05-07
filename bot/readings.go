@@ -14,6 +14,12 @@ import (
 // Units A to P
 var allUnits = []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"}
 
+// looksLikePayment returns true if text looks like "a=300" but missing birr
+func looksLikePayment(text string) bool {
+	re := regexp.MustCompile(`(?i)[a-p]\s*=\s*\d+`)
+	return re.MatchString(text)
+}
+
 // parseFixReading parses "/fixreading a=340, b=590" style input
 func parseFixReading(text string) (map[string]int, bool) {
 	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(text)), "/fixreading") {
