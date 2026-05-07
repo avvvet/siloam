@@ -38,7 +38,7 @@ func (b *Bot) Start() {
 	// b.sendManualBillMessage()
 
 	// Uncomment on May 7 only, then comment back
-	b.sendMay7Reminder()
+	//b.sendMay7Reminder()
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
