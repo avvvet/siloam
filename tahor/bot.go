@@ -263,8 +263,6 @@ func (b *Bot) handleTahorEnd(msg *tgbotapi.Message) {
 	}
 
 	sessions, _ := b.db.GetCleaningSessions(cycle.ID)
-	payments, _ := b.db.GetTahorPayments(cycle.ID)
-	ledger, _ := b.db.GetTahorLedger(cycle.ID)
 
 	// Post final summary
 	b.sendToGroup(fmt.Sprintf(
@@ -370,6 +368,7 @@ func (b *Bot) handleExpense(msg *tgbotapi.Message, amount float64, reason string
 
 	payments, _ := b.db.GetTahorPayments(cycle.ID)
 	ledger, _ := b.db.GetTahorLedger(cycle.ID)
+
 	b.sendToGroup(fmt.Sprintf("📤 *%.0f ብር (%s) ወጪ ተመዝግቧል!*\n\n%s%s", amount, reason, buildBalance(payments, ledger), footer))
 }
 
@@ -392,6 +391,7 @@ func (b *Bot) handleFundPayment(msg *tgbotapi.Message, unit string, amount float
 	b.db.SaveTahorPayment(cycle.ID, unit, amount)
 
 	payments, _ := b.db.GetTahorPayments(cycle.ID)
+
 	b.sendToGroup(buildPaymentSummary(payments) + footer)
 
 	if allPaid(payments) {
@@ -411,9 +411,9 @@ func (b *Bot) handleBalance(msg *tgbotapi.Message) {
 		return
 	}
 
+	sessions, _ := b.db.GetCleaningSessions(cycle.ID)
 	payments, _ := b.db.GetTahorPayments(cycle.ID)
 	ledger, _ := b.db.GetTahorLedger(cycle.ID)
-	sessions, _ := b.db.GetCleaningSessions(cycle.ID)
 
 	text := buildBalance(payments, ledger)
 	if cycle.CleanerActive {
