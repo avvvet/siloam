@@ -14,7 +14,7 @@ import (
 
 const footer = "\n\n— Tahor | Cleaning Fund Manager"
 
-const totalCleaningSessions = 16
+const totalCleaningSessions = 24
 
 const introMessage = `የጽዳት ጉዳይ ላይ አስተያየታችሁን እንድትሰጡ ተጠይቃችሁ ነበር፣ ምላሽ ባለመገኘቱ — እኔ ታሆር ለመፍትሄ ተሰይሜያለሁ!
 
@@ -252,7 +252,7 @@ func (b *Bot) handleTahorStart(msg *tgbotapi.Message) {
 	b.sendToGroup(
 		"🧹 *የጽዳት አገልግሎት ተጀምሯል!*\n\n" +
 			"📅 ጽዳት: ረቡዕ እና ቅዳሜ — በወር 8 ጊዜ\n" +
-			"📊 ጠቅላላ: 16 ክፍለ ጊዜ\n\n" +
+			"📊 ጠቅላላ: 24 ክፍለ ጊዜ (3 ወር)\n\n" +
 			"ጽዳቱ ሲጠናቀቅ: tahor cleaned 1 ይጻፉ" + footer)
 }
 
@@ -266,12 +266,46 @@ func (b *Bot) handleTahorEnd(msg *tgbotapi.Message) {
 	payments, _ := b.db.GetTahorPayments(cycle.ID)
 	ledger, _ := b.db.GetTahorLedger(cycle.ID)
 
+	// Post final summary
 	b.sendToGroup(fmt.Sprintf(
 		"✅ *የጽዳት አገልግሎት ተጠናቋል!*\n\n"+
-			"🧹 *የጸዳ ክፍለ ጊዜ:* %d/%d\n\n"+
-			"%s\n\n"+
+			"🧹 አፓርታማው ባለፉት 2 ወራት *%d* ጊዜ ተጸድቷል!\n\n"+
 			"እናመሰግናለን! 🙏%s",
-		len(sessions), totalCleaningSessions, buildBalance(payments, ledger), footer))
+		len(sessions), footer))
+
+	// Start new cycle automatically with same delegate
+	delegate, _ := b.db.GetTahorDelegate()
+
+	cycleNumber := len(cycle.UsedUnits) + 1
+	newCycleID := fmt.Sprintf("%s-C%d", time.Now().Format("2006"), cycleNumber)
+	newCycle := &db.TahorCycle{
+		ID:            newCycleID,
+		StartedAt:     time.Now(),
+		Active:        true,
+		CleanerActive: true,
+		UsedUnits:     cycle.UsedUnits,
+	}
+	b.db.SaveTahorCycle(newCycle)
+
+	// Announce new cycle
+	delegateUnit := "?"
+	delegateAccount := "?"
+	if delegate != nil {
+		delegateUnit = strings.ToUpper(delegate.Unit)
+		delegateAccount = delegate.Account
+		// Update delegate cycle ID
+		delegate.CycleID = newCycleID
+		b.db.SaveTahorDelegate(delegate)
+	}
+
+	b.sendToGroup(fmt.Sprintf(
+		"🔄 *ዑደቱ ተጠናቋል! አዲስ 3 ወር ዑደት ተጀምሯል!*\n\n"+
+			"👤 *ረዳት ቤት %s ተመሳሳይ ነው።*\n"+
+			"📌 *የክፍያ አካውንት:* _%s_\n\n"+
+			"እባክዎ 600 ብር ይላኩ *(በወር 200 ብር ማለት ነው)*\n\n"+
+			"ከከፈሉ በኋላ ይህንን ይጻፉ:\n"+
+			"`tahor a=600`%s",
+		delegateUnit, delegateAccount, footer))
 }
 
 func (b *Bot) handleCleaned(msg *tgbotapi.Message, session int) {
