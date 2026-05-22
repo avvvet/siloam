@@ -57,7 +57,36 @@ func New(cfg *config.Config, database *db.DB) (*Bot, error) {
 		return nil, err
 	}
 
-	return &Bot{api: api, db: database, cfg: cfg}, nil
+	bot := &Bot{api: api, db: database, cfg: cfg}
+
+	// Add P, A, C to UsedUnits for current cycle if not already there
+	bot.ensurePreviouslyServed([]string{"p", "a", "c"})
+
+	return bot, nil
+}
+
+func (b *Bot) ensurePreviouslyServed(served []string) {
+	cycle, err := b.db.GetTahorCycle()
+	if err != nil || cycle == nil {
+		return
+	}
+	changed := false
+	for _, s := range served {
+		found := false
+		for _, u := range cycle.UsedUnits {
+			if u == s {
+				found = true
+				break
+			}
+		}
+		if !found {
+			cycle.UsedUnits = append(cycle.UsedUnits, s)
+			changed = true
+		}
+	}
+	if changed {
+		b.db.SaveTahorCycle(cycle)
+	}
 }
 
 func (b *Bot) Start() {
@@ -202,7 +231,10 @@ func (b *Bot) runDraw() {
 	b.db.SaveTahorDelegate(delegate)
 
 	b.sendToGroup(fmt.Sprintf(
-		"🎉 *ዕጣ ወጣ!*\n\n*ቤት %s* ለሚቀጥሉት 3 ወራት አብሮ የሚረዳኝ ቤት ሆኖ ተመርጧል!\n\nእባክዎ ወድያው የክፍያ መሰብሰቢያ አካውንትዎን ያጋሩ:\n`/account cbe 1234567890`\n\n_(ከቤተሰብ ውስጥ አንድ ሰው መወከል ይቻላል)_%s",
+		"🎉 *ዕጣ ወጣ!*\n\n*ቤት %s* ለሚቀጥሉት 3 ወራት አብሮ የሚረዳኝ ቤት ሆኖ ተመርጧል!\n\n"+
+			"እባክዎ ወድያው የክፍያ መሰብሰቢያ አካውንትዎን ያጋሩ:\n`/account cbe 1234567890`\n\n"+
+			"💡 አካውንት ቁጥር ብቻ ያጋሩ — ቀሪውን ታሆር ትሠራለች! ይህ ሃላፊነት በ4 ዓመት አንድ ጊዜ ብቻ ነው። 😊\n\n"+
+			"_(ከቤተሰብ ውስጥ አንድ ሰው መወከል ይቻላል)_%s",
 		strings.ToUpper(selected), footer,
 	))
 }
@@ -232,11 +264,29 @@ func (b *Bot) handleDecline(msg *tgbotapi.Message, reason string) {
 	b.db.SaveTahorDelegate(delegate)
 
 	b.sendToGroup(fmt.Sprintf(
-		"ℹ️ *ቤት %s 거절 አድርጓል*\nምክንያት: %s\n\nሌላ ረዳት እየመረጥኩ ነው...%s",
+		"ℹ️ *ቤት %s 거절 አድርጓል*\nምክንያት: %s\n\n"+
+			"ዛሬ ከቀኑ 12 ሰዓት ላይ አዲስ ዕጣ ይወጣል!\n"+
+			"ቤቶቹ P, A, C አስቀድሞ አገልግለዋል — በዕጣው አይካተቱም።\n\n"+
+			"እስከዚያ ድረስ ክፍያ ለጊዜው ቆሟል።\n\n"+
+			"💡 ሃላፊነቱ በ4 ዓመት አንድ ጊዜ ብቻ ነው — ቀላል ነው! 😊%s",
 		strings.ToUpper(delegate.Unit), reason, footer,
 	))
 
-	b.runDraw()
+	// Schedule draw at 6PM today via cron (one-time)
+	loc, _ := time.LoadLocation("Europe/Moscow")
+	now := time.Now().In(loc)
+	if now.Hour() < 18 {
+		// Schedule for 6PM today
+		drawTime := time.Date(now.Year(), now.Month(), now.Day(), 18, 0, 0, 0, loc)
+		delay := time.Until(drawTime)
+		go func() {
+			time.Sleep(delay)
+			b.runDraw()
+		}()
+	} else {
+		// Already past 6PM — run immediately
+		b.runDraw()
+	}
 }
 
 func (b *Bot) handleTahorStart(msg *tgbotapi.Message) {
@@ -271,9 +321,7 @@ func (b *Bot) handleTahorEnd(msg *tgbotapi.Message) {
 			"እናመሰግናለን! 🙏%s",
 		len(sessions), footer))
 
-	// Start new cycle automatically with same delegate
-	delegate, _ := b.db.GetTahorDelegate()
-
+	// Create new cycle and run draw automatically
 	cycleNumber := len(cycle.UsedUnits) + 1
 	newCycleID := fmt.Sprintf("%s-C%d", time.Now().Format("2006"), cycleNumber)
 	newCycle := &db.TahorCycle{
@@ -285,25 +333,8 @@ func (b *Bot) handleTahorEnd(msg *tgbotapi.Message) {
 	}
 	b.db.SaveTahorCycle(newCycle)
 
-	// Announce new cycle
-	delegateUnit := "?"
-	delegateAccount := "?"
-	if delegate != nil {
-		delegateUnit = strings.ToUpper(delegate.Unit)
-		delegateAccount = delegate.Account
-		// Update delegate cycle ID
-		delegate.CycleID = newCycleID
-		b.db.SaveTahorDelegate(delegate)
-	}
-
-	b.sendToGroup(fmt.Sprintf(
-		"🔄 *ዑደቱ ተጠናቋል! አዲስ 3 ወር ዑደት ተጀምሯል!*\n\n"+
-			"👤 *ረዳት ቤት %s ተመሳሳይ ነው።*\n"+
-			"📌 *የክፍያ አካውንት:* _%s_\n\n"+
-			"እባክዎ 600 ብር ይላኩ *(በወር 200 ብር ማለት ነው)*\n\n"+
-			"ከከፈሉ በኋላ ይህንን ይጻፉ:\n"+
-			"`tahor a=600`%s",
-		delegateUnit, delegateAccount, footer))
+	// Run draw for new delegate
+	b.runDraw()
 }
 
 func (b *Bot) handleCleaned(msg *tgbotapi.Message, session int) {
