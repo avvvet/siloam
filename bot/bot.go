@@ -114,6 +114,11 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		if bill == nil || !bill.Finalized {
 			return
 		}
+		// If all 16 units already paid — ignore
+		allPayments, _ := b.db.GetAllPayments()
+		if len(allPayments) == 16 {
+			return
+		}
 		b.handlePayments(msg, payments)
 		return
 	}

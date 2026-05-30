@@ -264,7 +264,7 @@ func (b *Bot) handleDecline(msg *tgbotapi.Message, reason string) {
 	b.db.SaveTahorDelegate(delegate)
 
 	b.sendToGroup(fmt.Sprintf(
-		"ℹ️ *ቤት %s 거절 አድርጓል*\nምክንያት: %s\n\n"+
+		"ℹ️ *ቤት %s ፈቃደኛ አልሆነም።*\nምክንያት: %s\n\n"+
 			"ዛሬ ከቀኑ 12 ሰዓት ላይ አዲስ ዕጣ ይወጣል!\n"+
 			"ቤቶቹ P, A, C አስቀድሞ አገልግለዋል — በዕጣው አይካተቱም።\n\n"+
 			"እስከዚያ ድረስ ክፍያ ለጊዜው ቆሟል።\n\n"+
@@ -369,6 +369,16 @@ func (b *Bot) handleCleaned(msg *tgbotapi.Message, session int) {
 	} else {
 		remaining := totalCleaningSessions - session
 		b.sendToGroup(fmt.Sprintf("✅ *Apartment cleaning confirmed!*\n🧹 *Cleaned: %d | Remaining: %d*%s", session, remaining, footer))
+	}
+
+	// Cleaner payment reminder at session 8, 16, 24
+	if session == 8 || session == 16 || session == totalCleaningSessions {
+		delegate, _ := b.db.GetTahorDelegate()
+		delegateUnit := "?"
+		if delegate != nil {
+			delegateUnit = strings.ToUpper(delegate.Unit)
+		}
+		b.sendToGroup(fmt.Sprintf("💰 *ረዳት ቤት %s እባክዎ የጽዳት ሠራተኛ የወር ክፍያ ይፈጽሙ።*%s", delegateUnit, footer))
 	}
 }
 
