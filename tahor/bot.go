@@ -364,21 +364,29 @@ func (b *Bot) handleCleaned(msg *tgbotapi.Message, session int) {
 	b.db.SaveCleaningSession(cycle.ID, session)
 	sessions, _ = b.db.GetCleaningSessions(cycle.ID)
 
-	if session == totalCleaningSessions {
-		b.sendToGroup(fmt.Sprintf("🎉 *Apartment cleaning confirmed!*\n🧹 *Cleaned: %d | Remaining: 0*\n\nAll sessions complete! Post: `tahor end`%s", totalCleaningSessions, footer))
-	} else {
-		remaining := totalCleaningSessions - session
-		b.sendToGroup(fmt.Sprintf("✅ *Apartment cleaning confirmed!*\n🧹 *Cleaned: %d | Remaining: %d*%s", session, remaining, footer))
+	delegate, _ := b.db.GetTahorDelegate()
+	delegateUnit := "?"
+	if delegate != nil {
+		delegateUnit = strings.ToUpper(delegate.Unit)
 	}
 
-	// Cleaner payment reminder at session 8, 16, 24
-	if session == 8 || session == 16 || session == totalCleaningSessions {
-		delegate, _ := b.db.GetTahorDelegate()
-		delegateUnit := "?"
-		if delegate != nil {
-			delegateUnit = strings.ToUpper(delegate.Unit)
-		}
-		b.sendToGroup(fmt.Sprintf("💰 *ረዳት ቤት %s እባክዎ የጽዳት ሠራተኛ የወር ክፍያ ይፈጽሙ።*%s", delegateUnit, footer))
+	// Determine next payment milestone
+	nextPayment := 8
+	if session >= 8 {
+		nextPayment = 16
+	}
+	if session >= 16 {
+		nextPayment = 24
+	}
+
+	if session == totalCleaningSessions {
+		b.sendToGroup(fmt.Sprintf("🎉 *Apartment cleaning confirmed!*\n🧹 *Cleaned: %d | Remaining: 0*\n\nAll sessions complete! Post: `tahor end`%s", totalCleaningSessions, footer))
+	} else if session == 8 || session == 16 {
+		// Payment due
+		b.sendToGroup(fmt.Sprintf("✅ *Apartment cleaning confirmed!*\n🧹 *Cleaned: %d | Remaining: %d*\n\n💰 *ረዳት ቤት %s እባክዎ የጽዳት ሠራተኛ የወር ክፍያ ይፈጽሙ።*\nክፍያ ሲፈጸም የተከፈለውን እዚህ ግሩፕ ላይ ይለጥፉ።%s", session, totalCleaningSessions-session, delegateUnit, footer))
+	} else {
+		remaining := totalCleaningSessions - session
+		b.sendToGroup(fmt.Sprintf("✅ *Apartment cleaning confirmed!*\n🧹 *Cleaned: %d | Remaining: %d*\n\n💡 *የ%dኛ ጽዳት ሲጠናቀቅ የሠራተኛ ክፍያ ይፈጸማል*%s", session, remaining, nextPayment, footer))
 	}
 }
 
