@@ -82,7 +82,7 @@ func parseBillCommand(text string) (float64, bool) {
 func isSubmissionOpen() bool {
 	loc, _ := time.LoadLocation("Europe/Moscow")
 	now := time.Now().In(loc)
-	return now.Day() == 6
+	return now.Day() == 6 || now.Day() == 7
 }
 
 // isBeforeWindow returns true if before the 6th
