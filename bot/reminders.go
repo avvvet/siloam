@@ -48,6 +48,44 @@ func (b *Bot) startScheduler() {
 		b.sendToGroup(fmt.Sprintf("⚠️ *WARNING:* Submission closes at midnight!\nStill waiting for: *%s*", strings.Join(pending, ", ")))
 	})
 
+	// 7th at 8AM — late submission warning (only if pending)
+	c.AddFunc("0 8 7 * *", func() {
+		readings, err := b.db.GetAllReadings()
+		if err != nil || len(readings) == 16 {
+			return
+		}
+		pending := pendingUnits(readings)
+		b.sendToGroup(fmt.Sprintf("⚠️ *እነዚህ ቤቶች የቆጣሪ ንባብ ስላላሳወቁ የወሃ ክፍያ ሪፖርቱ ሊዘጋጅ አልችለም!*\nያልላኩ: *%s*", strings.Join(pending, ", ")))
+	})
+
+	// 7th at 8AM, 1PM, 5PM — late submission warning (only if pending)
+	c.AddFunc("0 8 7 * *", func() {
+		readings, err := b.db.GetAllReadings()
+		if err != nil || len(readings) == 16 {
+			return
+		}
+		pending := pendingUnits(readings)
+		b.sendToGroup(fmt.Sprintf("⚠️ *እነዚህ ቤቶች የቆጣሪ ንባብ ባለማሳወቃቸው — የክፍያ ሪፖርት ሊዘጋጅ አልቻለም። እባክዎ ራሳውን የውሃ ቆጣሪ በአስቸኳይ ያሳውቁ።*\nያልላኩ: *%s*%s", strings.Join(pending, ", "), footer))
+	})
+
+	c.AddFunc("0 13 7 * *", func() {
+		readings, err := b.db.GetAllReadings()
+		if err != nil || len(readings) == 16 {
+			return
+		}
+		pending := pendingUnits(readings)
+		b.sendToGroup(fmt.Sprintf("⚠️ *እነዚህ ቤቶች የቆጣሪ ንባብ ባለማሳወቃቸው — የክፍያ ሪፖርት ሊዘጋጅ አልቻለም። እባክዎ ራሳውን የውሃ ቆጣሪ በአስቸኳይ ያሳውቁ።*\nያልላኩ: *%s*%s", strings.Join(pending, ", "), footer))
+	})
+
+	c.AddFunc("0 17 7 * *", func() {
+		readings, err := b.db.GetAllReadings()
+		if err != nil || len(readings) == 16 {
+			return
+		}
+		pending := pendingUnits(readings)
+		b.sendToGroup(fmt.Sprintf("🚨 *እነዚህ ቤቶች የቆጣሪ ንባብ ባለማሳወቃቸው — የክፍያ ሪፖርት ሊዘጋጅ አልቻለም። እባክዎ ራሳውን የውሃ ቆጣሪ በአስቸኳይ ያሳውቁ።*\nያልላኩ: *%s*%s", strings.Join(pending, ", "), footer))
+	})
+
 	// Midnight on 7th — finalize bill if posted
 	c.AddFunc("0 0 7 * *", func() {
 		b.finalizeBill()
