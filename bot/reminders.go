@@ -55,35 +55,27 @@ func (b *Bot) startScheduler() {
 			return
 		}
 		pending := pendingUnits(readings)
-		b.sendToGroup(fmt.Sprintf("⚠️ *እነዚህ ቤቶች የቆጣሪ ንባብ ስላላሳወቁ የወሃ ክፍያ ሪፖርቱ ሊዘጋጅ አልችለም!*\nያልላኩ: *%s*", strings.Join(pending, ", ")))
+		b.sendToGroup(fmt.Sprintf("🚨 *እነዚህ ቤቶች የቆጣሪ ንባብ ባለማሳወቃቸው — የክፍያ ሪፖርት ሊዘጋጅ አልቻለም።*\n\nያልላኩ: *%s*\n\nይህ ለሁሉም ቤቶች ቀጥተኛ ችግር ይፈጥራል።\n\nእባክዎ የራስዎን የውሃ ቆጣሪ ንባብ በአስቸኳይ ያሳውቁ። 🙏%s", strings.Join(pending, ", "), footer))
 	})
 
-	// 7th at 8AM, 1PM, 5PM — late submission warning (only if pending)
-	c.AddFunc("0 8 7 * *", func() {
-		readings, err := b.db.GetAllReadings()
-		if err != nil || len(readings) == 16 {
-			return
-		}
-		pending := pendingUnits(readings)
-		b.sendToGroup(fmt.Sprintf("⚠️ *እነዚህ ቤቶች የቆጣሪ ንባብ ባለማሳወቃቸው — የክፍያ ሪፖርት ሊዘጋጅ አልቻለም። እባክዎ ራሳውን የውሃ ቆጣሪ በአስቸኳይ ያሳውቁ።*\nያልላኩ: *%s*%s", strings.Join(pending, ", "), footer))
-	})
-
+	// 7th at 1PM — late submission warning (only if pending)
 	c.AddFunc("0 13 7 * *", func() {
 		readings, err := b.db.GetAllReadings()
 		if err != nil || len(readings) == 16 {
 			return
 		}
 		pending := pendingUnits(readings)
-		b.sendToGroup(fmt.Sprintf("⚠️ *እነዚህ ቤቶች የቆጣሪ ንባብ ባለማሳወቃቸው — የክፍያ ሪፖርት ሊዘጋጅ አልቻለም። እባክዎ ራሳውን የውሃ ቆጣሪ በአስቸኳይ ያሳውቁ።*\nያልላኩ: *%s*%s", strings.Join(pending, ", "), footer))
+		b.sendToGroup(fmt.Sprintf("🚨 *እነዚህ ቤቶች የቆጣሪ ንባብ ባለማሳወቃቸው — የክፍያ ሪፖርት ሊዘጋጅ አልቻለም።*\n\nያልላኩ: *%s*\n\nይህ ለሁሉም ቤቶች ቀጥተኛ ችግር ይፈጥራል።\n\nእባክዎ የራስዎን የውሃ ቆጣሪ ንባብ በአስቸኳይ ያሳውቁ። 🙏%s", strings.Join(pending, ", "), footer))
 	})
 
+	// 7th at 5PM — late submission warning (only if pending)
 	c.AddFunc("0 17 7 * *", func() {
 		readings, err := b.db.GetAllReadings()
 		if err != nil || len(readings) == 16 {
 			return
 		}
 		pending := pendingUnits(readings)
-		b.sendToGroup(fmt.Sprintf("🚨 *እነዚህ ቤቶች የቆጣሪ ንባብ ባለማሳወቃቸው — የክፍያ ሪፖርት ሊዘጋጅ አልቻለም። እባክዎ ራሳውን የውሃ ቆጣሪ በአስቸኳይ ያሳውቁ።*\nያልላኩ: *%s*%s", strings.Join(pending, ", "), footer))
+		b.sendToGroup(fmt.Sprintf("🚨 *እነዚህ ቤቶች የቆጣሪ ንባብ ባለማሳወቃቸው — የክፍያ ሪፖርት ሊዘጋጅ አልቻለም።*\n\nያልላኩ: *%s*\n\nይህ ለሁሉም ቤቶች ቀጥተኛ ችግር ይፈጥራል።\n\nእባክዎ የራስዎን የውሃ ቆጣሪ ንባብ በአስቸኳይ ያሳውቁ። 🙏%s", strings.Join(pending, ", "), footer))
 	})
 
 	// Midnight on 7th — finalize bill if posted
