@@ -40,6 +40,14 @@ _(ከቤተሰብ ውስጥ አንድ ሰው መወከል ይቻላል)_
 ⏰ *ነገ እሁድ ከቀኑ 9 ሰዓት ላይ የመጀመሪያውን ዕጣ አወጣለሁ!*
 ዕጣ የወጣለት ቤት ወዲያው የክፍያ መሰብሰቢያ አካውንት ይላኩልኝ!`
 
+const thanksMessage = `🙏 *ምስጋና ለቤት %s — የትናየት መኩሪያ!*
+
+ባለፉት 3 ወራት የጽዳት ፈንዱን በመሰብሰብ፣ ለጽዳት ሠራተኛዋ ወርሃዊ ክፍያ በመፈጸም፣ የውሃ ክፍያውን ከሁሉም ቤት በመሰብሰብ ጠቅላላውን ሂሳብ በመክፈል፣ እንዲሁም አጠቃላይ አስተዳደሩን እና የሂሳብ ማወራረዱን በቅርበት በመከታተል ላበረከቱት አገልግሎት በሁላችንም ስም እናመሰግናለን! 👏
+
+🎲 ነገ ከቀኑ 9 ሰዓት ላይ አዲስ ዕጣ ይወጣል — ለቀጣዮቹ 3 ወራት ቡድኑን የሚያገለግል ቤት ይመረጣል።
+
+💡 ሃላፊነቱ አካውንት ማጋራት ብቻ ነው፣ በ4 ዓመት አንድ ጊዜ ብቻ ይደርሳል። ቀላል ነው! 😊`
+
 type Bot struct {
 	api *tgbotapi.BotAPI
 	db  *db.DB
@@ -95,6 +103,10 @@ func (b *Bot) Start() {
 	// Uncomment to post intro once
 	// b.sendToGroup(introMessage + footer)
 
+	// Uncomment to post the outgoing-delegate thank-you once,
+	// then re-comment and redeploy so a restart does not repeat it.
+	b.postThanks()
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := b.api.GetUpdatesChan(u)
@@ -105,6 +117,15 @@ func (b *Bot) Start() {
 		}
 		go b.handleMessage(update.Message)
 	}
+}
+
+func (b *Bot) postThanks() {
+	delegate, err := b.db.GetTahorDelegate()
+	if err != nil || delegate == nil {
+		log.Println("postThanks: no delegate found, skipping")
+		return
+	}
+	b.sendToGroup(fmt.Sprintf(thanksMessage, strings.ToUpper(delegate.Unit)) + footer)
 }
 
 func (b *Bot) handleMessage(msg *tgbotapi.Message) {
