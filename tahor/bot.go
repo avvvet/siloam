@@ -105,7 +105,7 @@ func (b *Bot) Start() {
 
 	// Uncomment to post the outgoing-delegate thank-you once,
 	// then re-comment and redeploy so a restart does not repeat it.
-	b.postThanks()
+	//b.postThanks()
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
